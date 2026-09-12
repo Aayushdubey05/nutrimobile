@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
+import BottomNav from "@/components/BottomNav";
 import SectionHeader from "../../src/components/SectionHeader";
 import { colors } from "../../src/constants/colors";
 import CalorieCard from "../../src/features/home/components/CalorieCard";
@@ -47,6 +48,13 @@ export default function DashboardScreen() {
             title="Scan food"
             subtitle="Analyze a meal"
             onPress={() => router.push("/main/scan")}
+          />
+
+          <QuickAction
+            icon="book-outline"
+            title="Diary"
+            subtitle="View today's meals"
+            onPress={() => router.push("/main/diary")}
           />
 
           <QuickAction
@@ -103,6 +111,8 @@ export default function DashboardScreen() {
           <NutritionItem label="Fat" value="38g" target="70g" />
         </View>
       </ScrollView>
+
+      <BottomNav active="home" />
     </View>
   );
 }
