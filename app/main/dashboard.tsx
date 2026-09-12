@@ -52,8 +52,8 @@ export default function DashboardScreen() {
           <QuickAction
             icon="add-outline"
             title="Add meal"
-            subtitle="Log food manually"
-            onPress={() => {}}
+            subtitle="Enter food manually"
+            onPress={() => router.push("/main/manual-entry")}
           />
 
           <QuickAction
