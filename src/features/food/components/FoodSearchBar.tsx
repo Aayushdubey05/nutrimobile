@@ -18,21 +18,25 @@ export default function FoodSearchBar({
 }: FoodSearchBarProps) {
   return (
     <View style={styles.container}>
-      <Ionicons name="search-outline" size={21} color={colors.icon} />
+      <Ionicons name="search-outline" size={20} color="#9CA3AF" />
 
       <TextInput
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={colors.placeholder}
+        placeholderTextColor="#9CA3AF"
         style={styles.input}
         autoCapitalize="none"
         returnKeyType="search"
       />
 
       {value.length > 0 && (
-        <Pressable onPress={onClear} hitSlop={10} style={styles.clearButton}>
-          <Ionicons name="close-circle" size={19} color={colors.placeholder} />
+        <Pressable
+          onPress={onClear}
+          hitSlop={10}
+          style={({ pressed }) => [styles.clearButton, pressed && styles.pressed]}
+        >
+          <Ionicons name="close-circle" size={19} color="#9CA3AF" />
         </Pressable>
       )}
     </View>
@@ -41,26 +45,39 @@ export default function FoodSearchBar({
 
 const styles = StyleSheet.create({
   container: {
-    height: 56,
+    height: 52,
     width: "100%",
     backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 16,
+    borderColor: "#E5E7EB",
+    borderRadius: 18,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
+    marginBottom: 20,
+
+    elevation: 2,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
   },
 
   input: {
     flex: 1,
     height: "100%",
     marginLeft: 10,
-    fontSize: 16,
+    fontSize: 15,
+    fontWeight: "500",
     color: colors.text,
   },
 
   clearButton: {
     marginLeft: 8,
   },
+
+  pressed: {
+    opacity: 0.7,
+  },
 });
+
