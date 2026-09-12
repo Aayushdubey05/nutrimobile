@@ -2,16 +2,17 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-    Image,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  Image,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 
+import ExplainabilitySheet from "@/features/nutrition/components/ExplainabilitySheet";
 import Button from "../../src/components/Button";
 import { colors } from "../../src/constants/colors";
 import NutritionMacroCard from "../../src/features/nutrition/components/NutritionMacroCard";
@@ -31,7 +32,7 @@ export default function NutritionResultScreen() {
 
   const [selectedPreset, setSelectedPreset] = useState(250);
 
-  const [showEstimation, setShowEstimation] = useState(false);
+  const [showExplainability, setShowExplainability] = useState(false);
 
   const handleDecrease = () => {
     setPortion((current) => Math.max(50, current - 50));
@@ -190,7 +191,7 @@ export default function NutritionResultScreen() {
           {/* Estimation Explanation */}
           <Pressable
             style={styles.explanationHeader}
-            onPress={() => setShowEstimation((current) => !current)}
+            onPress={() => setShowExplainability(true)}
           >
             <View style={styles.explanationTitleRow}>
               <Ionicons
@@ -205,20 +206,11 @@ export default function NutritionResultScreen() {
             </View>
 
             <Ionicons
-              name={showEstimation ? "chevron-up" : "chevron-down"}
+              name="chevron-forward"
               size={19}
               color={colors.secondaryText}
             />
           </Pressable>
-
-          {showEstimation && (
-            <View style={styles.explanationBody}>
-              <Text style={styles.explanationText}>
-                Calculated using 3D depth estimation and Indian food composition
-                data.
-              </Text>
-            </View>
-          )}
 
           {/* Actions */}
           <View style={styles.actions}>
@@ -234,6 +226,11 @@ export default function NutritionResultScreen() {
             </Pressable>
           </View>
         </ScrollView>
+
+        <ExplainabilitySheet
+          visible={showExplainability}
+          onClose={() => setShowExplainability(false)}
+        />
       </SafeAreaView>
     </View>
   );
@@ -425,21 +422,6 @@ const styles = StyleSheet.create({
   explanationTitle: {
     fontSize: 14,
     fontWeight: "500",
-    color: colors.secondaryText,
-  },
-
-  explanationBody: {
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 4,
-  },
-
-  explanationText: {
-    fontSize: 13,
-    lineHeight: 20,
     color: colors.secondaryText,
   },
 
