@@ -67,7 +67,10 @@ export default function LoginScreen() {
             </Pressable>
 
             {/* Login */}
-            <Button title="Login" onPress={() => {}} />
+            <Button
+              title="Login"
+              onPress={() => router.replace("/main/dashboard")}
+            />
 
             {/* Sign up */}
             <View style={styles.signupContainer}>

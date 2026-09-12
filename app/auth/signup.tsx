@@ -1,13 +1,13 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from "react-native";
 
 import Button from "../../src/components/Button";
@@ -74,7 +74,10 @@ export default function SignupScreen() {
             />
 
             {/* Create Account */}
-            <Button title="Create account" onPress={() => {}} />
+            <Button
+              title="Create account"
+              onPress={() => router.replace("/main/dashboard")}
+            />
 
             {/* Login */}
             <View style={styles.loginContainer}>
