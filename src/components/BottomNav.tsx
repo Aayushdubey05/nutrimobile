@@ -18,27 +18,27 @@ const NAV_ITEMS: NavItem[] = [
   {
     label: "Home",
     icon: "home-outline",
-    route: "/(main)/dashboard",
+    route: "/main/dashboard",
   },
   {
     label: "Diary",
     icon: "book-outline",
-    route: "/(main)/diary",
+    route: "/main/diary",
   },
   {
     label: "Scan",
     icon: "camera-outline",
-    route: "/(main)/scan",
+    route: "/main/scan",
   },
   {
     label: "Progress",
     icon: "stats-chart-outline",
-    route: "/(main)/progress",
+    route: "/main/progress",
   },
   {
     label: "Profile",
     icon: "person-outline",
-    route: "/(main)/profile",
+    route: "/main/profile",
   },
 ];
 
