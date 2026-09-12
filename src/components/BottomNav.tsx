@@ -11,7 +11,7 @@ type NavItem = {
 };
 
 interface BottomNavProps {
-  active: "home" | "diary" | "scan" | "progress" | "profile";
+  active: "home" | "diary" | "scan" | "progress" | "profile" | null;
 }
 
 const NAV_ITEMS: NavItem[] = [

@@ -51,6 +51,13 @@ export default function DashboardScreen() {
           />
 
           <QuickAction
+            icon="add-outline"
+            title="Add meal"
+            subtitle="Enter food manually"
+            onPress={() => router.push("/main/manual-entry")}
+          />
+
+          <QuickAction
             icon="book-outline"
             title="Diary"
             subtitle="View today's meals"
@@ -58,10 +65,10 @@ export default function DashboardScreen() {
           />
 
           <QuickAction
-            icon="add-outline"
-            title="Add meal"
-            subtitle="Enter food manually"
-            onPress={() => router.push("/main/manual-entry")}
+            icon="sparkles-outline"
+            title="Recommendations"
+            subtitle="View today's nutrition advice"
+            onPress={() => router.push("/main/recommendations")}
           />
 
           <QuickAction
@@ -71,12 +78,12 @@ export default function DashboardScreen() {
             onPress={() => {}}
           />
 
-          <QuickAction
+          {/* <QuickAction
             icon="bulb-outline"
             title="Recommendations"
             subtitle="Personalized tips"
             onPress={() => {}}
-          />
+          /> */}
         </View>
 
         {/* Recent Meals */}
