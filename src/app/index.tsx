@@ -1,98 +1,152 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
+import {
+  Dimensions,
+  Image,
+  Pressable,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+const { width } = Dimensions.get('window');
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+export default function OnboardingScreen() {
+  const router = useRouter();
 
-export default function HomeScreen() {
+  const handleGetStarted = () => {
+    router.push('/auth/login');
+  };
+
   return (
-    <ThemedView style={styles.container}>
+    <>
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="#F7F5F3"
+      />
+
       <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
+        <View style={styles.container}>
 
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
+          {/* App Name */}
+          <Text style={styles.appName}>
+            NutriVision-3D
+          </Text>
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+          {/* Food Image */}
+          <View style={styles.imageContainer}>
+            <Image
+              source={{
+                uri: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=900&q=85',
+              }}
+              style={styles.foodImage}
+              resizeMode="cover"
+            />
+          </View>
 
-        {Platform.OS === 'web' && <WebBadge />}
+          {/* Tagline */}
+          <Text style={styles.tagline}>
+            See your food. Understand your nutrition.
+          </Text>
+
+          {/* Bottom Button */}
+          <Pressable
+            onPress={handleGetStarted}
+            style={({ pressed }) => [
+              styles.button,
+              pressed && styles.buttonPressed,
+            ]}
+          >
+            <Text style={styles.buttonText}>
+              Get Started
+            </Text>
+          </Pressable>
+
+        </View>
       </SafeAreaView>
-    </ThemedView>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
   safeArea: {
     flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
+    backgroundColor: '#F7F5F3',
   },
-  heroSection: {
+
+  container: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 26,
+  },
+
+  appName: {
+    marginTop: 62,
+    fontSize: 29,
+    fontWeight: '800',
+    color: '#1B1B1B',
+    letterSpacing: -0.8,
+  },
+
+  imageContainer: {
+    width: width - 52,
+    height: width - 52,
+    maxHeight: 390,
+    marginTop: 30,
+    borderRadius: 19,
+    overflow: 'hidden',
+
+    // Android shadow
+    elevation: 5,
+
+    // iOS shadow
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+  },
+
+  foodImage: {
+    width: '100%',
+    height: '100%',
+  },
+
+  tagline: {
+    marginTop: 32,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#222222',
+    textAlign: 'center',
+    letterSpacing: 0.1,
+  },
+
+  button: {
+    position: 'absolute',
+    left: 26,
+    right: 26,
+    bottom: 66,
+
+    height: 56,
+    borderRadius: 30,
+
+    backgroundColor: '#1B1B1B',
+
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
   },
-  title: {
-    textAlign: 'center',
+
+  buttonPressed: {
+    opacity: 0.8,
   },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.1,
   },
 });
