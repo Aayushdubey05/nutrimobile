@@ -1,12 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import {
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 
 import Button from "../../src/components/Button";
@@ -71,8 +71,8 @@ export default function SegmentationReviewScreen() {
           <View style={styles.buttonContainer}>
             <Button
               title="Continue analysis"
-              //   onPress={() => router.push("/(main)/nutrition-result")}
-              onPress={() => {}}
+              onPress={() => router.push("/main/nutrition-result")}
+              // onPress={() => {}}
             />
           </View>
         </ScrollView>
