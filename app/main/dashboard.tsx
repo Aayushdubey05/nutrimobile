@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import SectionHeader from "../../src/components/SectionHeader";
@@ -45,7 +46,7 @@ export default function DashboardScreen() {
             icon="camera-outline"
             title="Scan food"
             subtitle="Analyze a meal"
-            onPress={() => {}}
+            onPress={() => router.push("/main/scan")}
           />
 
           <QuickAction
