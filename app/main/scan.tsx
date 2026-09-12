@@ -45,8 +45,16 @@ export default function ScanScreen() {
             </Pressable>
 
             {/* Capture */}
-            <Pressable style={styles.captureButton} onPress={() => {}}>
-              <View style={styles.captureInner} />
+            <Pressable
+              style={({ pressed }) => [
+                styles.captureButton,
+                pressed && { opacity: 0.8, transform: [{ scale: 0.95 }] },
+              ]}
+              onPress={() => {
+                router.push("/main/segmentation-review");
+              }}
+            >
+              <View style={styles.captureInner} pointerEvents="none" />
             </Pressable>
 
             {/* Placeholder */}
@@ -127,6 +135,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-around",
     paddingHorizontal: 30,
+    zIndex: 10,
   },
 
   sideButton: {
