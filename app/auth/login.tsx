@@ -1,13 +1,13 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 
 import Button from "@/components/Button";
@@ -32,7 +32,10 @@ export default function LoginScreen() {
       >
         <View style={styles.container}>
           {/* Header */}
-          <AuthHeader />
+          <AuthHeader
+            title="Welcome back"
+            subtitle="Log in to continue tracking your meals."
+          />
 
           {/* Form */}
           <View style={styles.form}>
@@ -56,7 +59,10 @@ export default function LoginScreen() {
             <ErrorMessage message="Invalid email or password" />
 
             {/* Forgot password */}
-            <Pressable style={styles.forgotButton} onPress={() => router.push("/auth/forgot-password")}>
+            <Pressable
+              style={styles.forgotButton}
+              onPress={() => router.push("/auth/forgot-password")}
+            >
               <Text style={styles.forgotText}>Forgot password?</Text>
             </Pressable>
 
