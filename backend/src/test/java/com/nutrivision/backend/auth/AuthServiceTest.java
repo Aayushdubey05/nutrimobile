@@ -1,8 +1,6 @@
 package com.nutrivision.backend.auth;
 
 import com.nutrivision.backend.auth.dto.AuthResponse;
-import com.nutrivision.backend.auth.dto.LoginRequest;
-import com.nutrivision.backend.auth.dto.RefreshTokenRequest;
 import com.nutrivision.backend.auth.dto.RegisterRequest;
 import com.nutrivision.backend.auth.service.AuthService;
 import com.nutrivision.backend.common.exception.EmailAlreadyExistsException;
@@ -21,7 +19,6 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.OffsetDateTime;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
