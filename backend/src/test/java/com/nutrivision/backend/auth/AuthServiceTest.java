@@ -6,7 +6,7 @@ import com.nutrivision.backend.auth.service.AuthService;
 import com.nutrivision.backend.common.exception.EmailAlreadyExistsException;
 import com.nutrivision.backend.user.entity.User;
 import com.nutrivision.backend.user.entity.UserRole;
-import com.nutrivision.backend.user.repository.RefreshTokenRepository;
+import com.nutrivision.backend.auth.repository.RefreshTokenRepository;
 import com.nutrivision.backend.user.repository.UserRepository;
 import com.nutrivision.backend.security.JwtService;
 import org.junit.jupiter.api.BeforeEach;

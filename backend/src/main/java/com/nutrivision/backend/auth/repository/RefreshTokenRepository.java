@@ -1,4 +1,4 @@
-package com.nutrivision.backend.user.repository;
+package com.nutrivision.backend.auth.repository;
 
 import com.nutrivision.backend.user.entity.RefreshToken;
 import org.springframework.data.jpa.repository.JpaRepository;

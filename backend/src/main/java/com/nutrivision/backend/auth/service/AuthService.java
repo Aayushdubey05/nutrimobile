@@ -10,7 +10,7 @@ import com.nutrivision.backend.security.JwtService;
 import com.nutrivision.backend.user.entity.RefreshToken;
 import com.nutrivision.backend.user.entity.User;
 import com.nutrivision.backend.user.entity.UserRole;
-import com.nutrivision.backend.user.repository.RefreshTokenRepository;
+import com.nutrivision.backend.auth.repository.RefreshTokenRepository;
 import com.nutrivision.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;

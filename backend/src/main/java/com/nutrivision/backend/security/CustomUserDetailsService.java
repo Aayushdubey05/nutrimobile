@@ -9,6 +9,8 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class CustomUserDetailsService implements UserDetailsService {
@@ -16,30 +18,46 @@ public class CustomUserDetailsService implements UserDetailsService {
     private final UserRepository userRepository;
 
     @Override
-    public UserDetails loadUserByUsername(String email)
-            throws UsernameNotFoundException {
+    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
 
         User user = userRepository.findByEmailIgnoreCase(email)
-                .orElseThrow(() ->
-                        new UsernameNotFoundException(
-                                "User not found"
-                        )
-                );
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
         if (user.isDeleted()) {
-            throw new UsernameNotFoundException(
-                    "User not found"
-            );
+            throw new UsernameNotFoundException("User not found");
         }
 
-        return org.springframework.security.core.userdetails.User
-                .withUsername(user.getEmail())
-                .password(user.getPasswordHash())
-                .authorities(
+        return new CustomUserDetails(
+                user.getId(),
+                user.getEmail(),
+                user.getPasswordHash(),
+                List.of(
                         new SimpleGrantedAuthority(
                                 "ROLE_" + user.getRole().name()
                         )
                 )
-                .build();
+        );
+    }
+
+    public UserDetails loadUserById(Long userId) throws UsernameNotFoundException {
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() ->
+                        new UsernameNotFoundException("User not found"));
+
+        if (user.isDeleted()) {
+            throw new UsernameNotFoundException("User not found");
+        }
+
+        return new CustomUserDetails(
+                user.getId(),
+                user.getEmail(),
+                user.getPasswordHash(),
+                List.of(
+                        new SimpleGrantedAuthority(
+                                "ROLE_" + user.getRole().name()
+                        )
+                )
+        );
     }
 }
