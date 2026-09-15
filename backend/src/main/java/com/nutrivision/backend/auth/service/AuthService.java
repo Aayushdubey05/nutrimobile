@@ -4,6 +4,8 @@ import com.nutrivision.backend.auth.dto.AuthResponse;
 import com.nutrivision.backend.auth.dto.LoginRequest;
 import com.nutrivision.backend.auth.dto.RefreshTokenRequest;
 import com.nutrivision.backend.auth.dto.RegisterRequest;
+import com.nutrivision.backend.common.exception.EmailAlreadyExistsException;
+import com.nutrivision.backend.common.exception.InvalidRefreshTokenException;
 import com.nutrivision.backend.security.JwtService;
 import com.nutrivision.backend.user.entity.RefreshToken;
 import com.nutrivision.backend.user.entity.User;
@@ -45,7 +47,7 @@ public class AuthService {
         String email = request.email().trim();
 
         if (userRepository.existsByEmailIgnoreCase(email)) {
-            throw new IllegalArgumentException(
+            throw new EmailAlreadyExistsException(
                     "Email is already registered"
             );
         }
@@ -109,20 +111,20 @@ public class AuthService {
 
         RefreshToken refreshToken = refreshTokenRepository.findByTokenHash(tokenHash)
                 .orElseThrow(() ->
-                        new IllegalArgumentException(
+                        new InvalidRefreshTokenException(
                                 "Invalid refresh token"
                         )
                 );
 
         if (refreshToken.getRevokedAt() != null) {
-            throw new IllegalArgumentException(
+            throw new InvalidRefreshTokenException(
                     "Refresh token has been revoked"
             );
         }
 
         if (refreshToken.getExpiresAt().isBefore(OffsetDateTime.now())) {
 
-            throw new IllegalArgumentException(
+            throw new InvalidRefreshTokenException(
                     "Refresh token has expired"
             );
         }

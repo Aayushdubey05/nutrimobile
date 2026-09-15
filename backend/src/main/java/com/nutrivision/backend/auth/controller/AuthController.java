@@ -5,6 +5,7 @@ import com.nutrivision.backend.auth.dto.LoginRequest;
 import com.nutrivision.backend.auth.dto.RefreshTokenRequest;
 import com.nutrivision.backend.auth.dto.RegisterRequest;
 import com.nutrivision.backend.auth.service.AuthService;
+import com.nutrivision.backend.common.response.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -19,23 +20,32 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest request) {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(authService.register(request));
+                .body(ApiResponse.success(
+                        "Registration successful",
+                        authService.register(request)
+                ));
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(
-                authService.login(request)
+                ApiResponse.success(
+                        "Login successful",
+                        authService.login(request)
+                )
         );
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
+    public ResponseEntity<ApiResponse<AuthResponse>> refresh(@Valid @RequestBody RefreshTokenRequest request) {
         return ResponseEntity.ok(
-                authService.refresh(request)
+                ApiResponse.success(
+                        "Token refreshed successfully",
+                        authService.refresh(request)
+                )
         );
     }
 }
