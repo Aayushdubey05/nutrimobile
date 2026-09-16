@@ -1,5 +1,8 @@
 package com.nutrivision.backend.user.entity;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -39,6 +42,7 @@ public class UserProfile {
     private Short age;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(nullable = false, columnDefinition = "gender_type")
     private GenderType gender;
 
@@ -52,10 +56,12 @@ public class UserProfile {
     private BigDecimal targetWeightKg;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "fitness_goal", nullable = false, columnDefinition = "fitness_goal_type")
     private FitnessGoalType fitnessGoal;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "activity_level", nullable = false, columnDefinition = "activity_level_type")
     private ActivityLevelType activityLevel;
 

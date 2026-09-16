@@ -1,5 +1,6 @@
 package com.nutrivision.backend.user.service;
 
+import com.nutrivision.backend.common.exception.UserSettingsNotFoundException;
 import com.nutrivision.backend.user.dto.UpdateUserSettingsRequest;
 import com.nutrivision.backend.user.dto.UserSettingsResponse;
 import com.nutrivision.backend.user.entity.User;
@@ -9,6 +10,8 @@ import com.nutrivision.backend.user.repository.UserSettingsRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.OffsetDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -22,7 +25,7 @@ public class UserSettingsService {
 
         UserSettings settings = userSettingsRepository.findByUserId(userId)
                 .orElseThrow(() ->
-                        new IllegalArgumentException("User settings not found")
+                        new UserSettingsNotFoundException("User settings not found")
                 );
 
         return toResponse(settings);
@@ -34,6 +37,8 @@ public class UserSettingsService {
             UpdateUserSettingsRequest request
     ) {
 
+        OffsetDateTime now = OffsetDateTime.now();
+
         UserSettings settings = userSettingsRepository.findByUserId(userId)
                 .orElseGet(() -> {
                     User user = userRepository.findById(userId)
@@ -43,12 +48,14 @@ public class UserSettingsService {
 
                     UserSettings newSettings = new UserSettings();
                     newSettings.setUser(user);
+                    newSettings.setCreatedAt(now);
                     return newSettings;
                 });
 
         settings.setNotificationsEnabled(
                 request.notificationsEnabled()
         );
+        settings.setUpdatedAt(now);
 
         return toResponse(userSettingsRepository.save(settings));
     }

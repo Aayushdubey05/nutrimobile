@@ -1,5 +1,6 @@
 package com.nutrivision.backend.user.service;
 
+import com.nutrivision.backend.common.exception.UserProfileNotFoundException;
 import com.nutrivision.backend.user.dto.DietaryRestrictionResponse;
 import com.nutrivision.backend.user.dto.HealthConditionResponse;
 import com.nutrivision.backend.user.dto.UpdateUserProfileRequest;
@@ -16,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -36,7 +38,7 @@ public class UserProfileService {
 
         UserProfile profile = userProfileRepository.findByUserId(userId)
                 .orElseThrow(() ->
-                        new IllegalArgumentException("User profile not found")
+                        new UserProfileNotFoundException("User profile not found")
                 );
 
         return toResponse(user, profile);
@@ -50,10 +52,13 @@ public class UserProfileService {
 
         User user = findUser(userId);
 
+        OffsetDateTime now = OffsetDateTime.now();
+
         UserProfile profile = userProfileRepository.findByUserId(userId)
                 .orElseGet(() -> {
                     UserProfile newProfile = new UserProfile();
                     newProfile.setUser(user);
+                    newProfile.setCreatedAt(now);
                     return newProfile;
                 });
 
@@ -64,12 +69,16 @@ public class UserProfileService {
         profile.setTargetWeightKg(request.targetWeightKg());
         profile.setFitnessGoal(request.fitnessGoal());
         profile.setActivityLevel(request.activityLevel());
+        profile.setUpdatedAt(now);
 
-        user.setDietaryRestrictions(
+        // Clear-and-add to keep Hibernate in sync with the join table
+        user.getDietaryRestrictions().clear();
+        user.getDietaryRestrictions().addAll(
                 findDietaryRestrictions(request.dietaryRestrictionIds())
         );
 
-        user.setHealthConditions(
+        user.getHealthConditions().clear();
+        user.getHealthConditions().addAll(
                 findHealthConditions(request.healthConditionIds())
         );
 
