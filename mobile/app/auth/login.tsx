@@ -15,10 +15,54 @@ import ErrorMessage from "@/components/ErrorMessage";
 import Input from "@/components/Input";
 import { colors } from "@/constants/colors";
 import AuthHeader from "@/features/auth/components/AuthHeader";
+import { useAuth } from "@/features/auth/hooks/useAuth";
+import { validateLoginForm } from "@/features/auth/validation";
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { login } = useAuth();
+
   const [showPassword, setShowPassword] = useState(false);
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleLogin() {
+    setError("");
+
+    const validationError = validateLoginForm({
+      email,
+      password,
+    });
+
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      await login({
+        email: email.trim(),
+        password,
+      });
+
+      router.replace("/main/dashboard");
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        "Invalid email or password";
+
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <KeyboardAvoidingView
@@ -31,52 +75,59 @@ export default function LoginScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.container}>
-          {/* Header */}
           <AuthHeader
             title="Welcome back"
             subtitle="Log in to continue tracking your meals."
           />
 
-          {/* Form */}
           <View style={styles.form}>
-            {/* Email */}
             <Input
               label="Email"
               placeholder="Enter your email"
               keyboardType="email-address"
+              value={email}
+              onChangeText={setEmail}
+              autoComplete="email"
+              editable={!loading}
             />
 
-            {/* Password */}
             <Input
               label="Password"
               placeholder="Enter your password"
               isPassword
               showPassword={showPassword}
               onTogglePassword={() => setShowPassword(!showPassword)}
+              value={password}
+              onChangeText={setPassword}
+              autoComplete="password"
+              editable={!loading}
             />
 
-            {/* Error */}
-            <ErrorMessage message="Invalid email or password" />
+            {error ? <ErrorMessage message={error} /> : null}
 
-            {/* Forgot password */}
             <Pressable
               style={styles.forgotButton}
               onPress={() => router.push("/auth/forgot-password")}
+              disabled={loading}
             >
               <Text style={styles.forgotText}>Forgot password?</Text>
             </Pressable>
 
-            {/* Login */}
             <Button
               title="Login"
-              onPress={() => router.replace("/main/dashboard")}
+              onPress={handleLogin}
+              loading={loading}
             />
 
-            {/* Sign up */}
             <View style={styles.signupContainer}>
-              <Text style={styles.signupText}>Don't have an account? </Text>
+              <Text style={styles.signupText}>
+                Don't have an account?{" "}
+              </Text>
 
-              <Pressable onPress={() => router.push("/auth/signup")}>
+              <Pressable
+                onPress={() => router.push("/auth/signup")}
+                disabled={loading}
+              >
                 <Text style={styles.signupLink}>Sign up</Text>
               </Pressable>
             </View>
