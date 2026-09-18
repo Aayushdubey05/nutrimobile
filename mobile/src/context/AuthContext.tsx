@@ -43,28 +43,31 @@ export function AuthProvider({
   }, []);
 
   async function restoreSession() {
-    try {
-      const accessToken = await authStorage.getAccessToken();
+  try {
+    const accessToken = await authStorage.getAccessToken();
 
-      if (!accessToken) {
-        setUser(null);
-        return;
-      }
-
-      // User information is stored in the auth response,
-      // but we will later call /users/me here.
-      //
-      // For now, access-token existence means a session
-      // may exist. The first authenticated API call will
-      // validate it.
-    } catch (error) {
-      console.error("Failed to restore session:", error);
-      await authStorage.clearTokens();
+    if (!accessToken) {
       setUser(null);
-    } finally {
-      setIsLoading(false);
+      return;
     }
+
+    const user = await authService.getCurrentUser();
+
+    setUser({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role.toString(),
+    });
+  } catch (error) {
+    console.log("Session restore failed:", error);
+
+    await authStorage.clearTokens();
+    setUser(null);
+  } finally {
+    setIsLoading(false);
   }
+}
 
   async function login(
     request: LoginRequest

@@ -105,13 +105,13 @@ export default function LoginScreen() {
 
             {error ? <ErrorMessage message={error} /> : null}
 
-            <Pressable
+            {/* <Pressable
               style={styles.forgotButton}
               onPress={() => router.push("/auth/forgot-password")}
               disabled={loading}
             >
               <Text style={styles.forgotText}>Forgot password?</Text>
-            </Pressable>
+            </Pressable> */}
 
             <Button
               title="Login"
