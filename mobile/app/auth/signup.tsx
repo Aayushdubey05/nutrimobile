@@ -57,7 +57,7 @@ export default function SignupScreen() {
         password,
       });
 
-      router.replace("/main/dashboard");
+      router.replace("/onboarding");
     } catch (error: any) {
       const message =
         error?.response?.data?.message ||
@@ -114,9 +114,7 @@ export default function SignupScreen() {
               placeholder="Create a password"
               isPassword
               showPassword={showPassword}
-              onTogglePassword={() =>
-                setShowPassword(!showPassword)
-              }
+              onTogglePassword={() => setShowPassword(!showPassword)}
               value={password}
               onChangeText={setPassword}
               autoComplete="new-password"
@@ -150,9 +148,7 @@ export default function SignupScreen() {
 
             {/* Login */}
             <View style={styles.loginContainer}>
-              <Text style={styles.loginText}>
-                Already have an account?{" "}
-              </Text>
+              <Text style={styles.loginText}>Already have an account? </Text>
 
               <Pressable
                 onPress={() => router.push("/auth/login")}

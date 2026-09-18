@@ -7,5 +7,15 @@ export const ENDPOINTS = {
 
   USER: {
     ME: "/users/me",
+    PROFILE: "/users/me/profile",
+    SETTINGS: "/users/me/settings",
+  },
+
+  DIETARY_RESTRICTIONS: "/dietary-restrictions",
+  HEALTH_CONDITIONS: "/health-conditions",
+
+  NUTRITION: {
+    TARGET: "/nutrition/target",
+    CALCULATE_TARGET: "/nutrition/target/calculate",
   },
 } as const;
