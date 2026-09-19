@@ -1,14 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import { useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Image,
   Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 
@@ -17,32 +18,84 @@ import Button from "../../src/components/Button";
 import { colors } from "../../src/constants/colors";
 import NutritionMacroCard from "../../src/features/nutrition/components/NutritionMacroCard";
 import PortionSizeCard from "../../src/features/nutrition/components/PortionSizeCard";
+import { foodService } from "../../src/features/food/services/foodService";
+import { Food } from "../../src/features/food/types";
+import { MealType } from "../../src/features/meal/types";
+import { mealService } from "../../src/features/meal/services/mealService";
 
-const FOOD_IMAGE_URL =
-  "https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=1000&q=85";
+const MEAL_TYPES: { label: string; value: MealType }[] = [
+  { label: "Breakfast", value: "BREAKFAST" },
+  { label: "Lunch", value: "LUNCH" },
+  { label: "Dinner", value: "DINNER" },
+  { label: "Snack", value: "SNACK" },
+  { label: "Other", value: "OTHER" },
+];
 
 export default function NutritionResultScreen() {
-  const [foodName, setFoodName] = useState("Paneer Butter Masala");
+  const { foodId } = useLocalSearchParams<{ foodId?: string }>();
 
-  const [editingName, setEditingName] = useState(false);
-
-  const [saved, setSaved] = useState(false);
-
-  const [portion, setPortion] = useState(250);
-
-  const [selectedPreset, setSelectedPreset] = useState(250);
+  const [food, setFood] = useState<Food | null>(null);
+  const [portion, setPortion] = useState(100);
+  const [selectedPreset, setSelectedPreset] = useState(100);
+  const [selectedMealType, setSelectedMealType] = useState<MealType>("OTHER");
 
   const [showExplainability, setShowExplainability] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (!foodId) {
+      setIsLoading(false);
+      return;
+    }
+
+    loadFood(Number(foodId));
+  }, [foodId]);
+
+  const loadFood = async (id: number) => {
+    try {
+      setIsLoading(true);
+
+      const data = await foodService.getFood(id);
+      setFood(data);
+    } catch {
+      Alert.alert(
+        "Food unavailable",
+        "Could not load this food. Please try again.",
+        [
+          {
+            text: "Go Back",
+            onPress: () => router.back(),
+          },
+        ],
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const nutrition = useMemo(() => {
+    if (!food?.nutrition) {
+      return null;
+    }
+
+    const multiplier = portion / 100;
+
+    return {
+      calories: food.nutrition.caloriesKcal * multiplier,
+      protein: food.nutrition.proteinG * multiplier,
+      carbs: food.nutrition.carbohydratesG * multiplier,
+      fat: food.nutrition.fatG * multiplier,
+    };
+  }, [food, portion]);
 
   const handleDecrease = () => {
     setPortion((current) => Math.max(50, current - 50));
-
     setSelectedPreset(0);
   };
 
   const handleIncrease = () => {
     setPortion((current) => Math.min(1000, current + 50));
-
     setSelectedPreset(0);
   };
 
@@ -51,15 +104,89 @@ export default function NutritionResultScreen() {
     setSelectedPreset(value);
   };
 
-  const handleSaveToLog = () => {
-    // UI-only for now.
-    // Later this will call the backend.
+  const handleSaveToLog = async () => {
+    if (!food) {
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+
+      const now = new Date();
+
+      const mealDate = [
+        now.getFullYear(),
+        String(now.getMonth() + 1).padStart(2, "0"),
+        String(now.getDate()).padStart(2, "0"),
+      ].join("-");
+
+      const mealTime = [
+        String(now.getHours()).padStart(2, "0"),
+        String(now.getMinutes()).padStart(2, "0"),
+        String(now.getSeconds()).padStart(2, "0"),
+      ].join(":");
+
+      await mealService.createMeal({
+        mealType: selectedMealType,
+        mealDate,
+        mealTime,
+        items: [
+          {
+            foodId: food.id,
+            customFoodId: null,
+            quantity: 1,
+            weightG: portion,
+          },
+        ],
+      });
+
+      Alert.alert(
+        "Meal Added",
+        `${food.name} has been added to your daily log.`,
+        [
+          {
+            text: "View Dashboard",
+            onPress: () => router.replace("/main/dashboard"),
+          },
+        ],
+      );
+    } catch {
+      Alert.alert(
+        "Unable to add meal",
+        "Something went wrong while saving your meal. Please try again.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingScreen}>
+        <ActivityIndicator size="large" color={colors.text} />
+        <Text style={styles.loadingText}>Loading food...</Text>
+      </View>
+    );
+  }
+
+  if (!food) {
+    return (
+      <View style={styles.loadingScreen}>
+        <Text style={styles.emptyTitle}>Food not available</Text>
+
+        <Pressable
+          style={styles.backToSearchButton}
+          onPress={() => router.back()}
+        >
+          <Text style={styles.backToSearchText}>Back</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.screen}>
       <SafeAreaView style={styles.safeArea}>
-        {/* Header */}
         <View style={styles.header}>
           <Pressable
             style={styles.headerButton}
@@ -69,86 +196,58 @@ export default function NutritionResultScreen() {
             <Ionicons name="chevron-back" size={23} color={colors.text} />
           </Pressable>
 
-          <Pressable
-            style={styles.headerButton}
-            onPress={() => setSaved((current) => !current)}
-            hitSlop={8}
-          >
-            <Ionicons
-              name={saved ? "bookmark" : "bookmark-outline"}
-              size={21}
-              color={colors.text}
-            />
-          </Pressable>
+          <View style={styles.headerButtonPlaceholder} />
         </View>
 
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.content}
         >
-          {/* Food Image */}
-          <Image
-            source={{ uri: FOOD_IMAGE_URL }}
-            style={styles.foodImage}
-            resizeMode="cover"
-          />
+          {food.imageUrl ? (
+            <Image
+              source={{ uri: food.imageUrl }}
+              style={styles.foodImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={styles.imageFallback}>
+              <Ionicons name="restaurant-outline" size={42} color="#737373" />
+            </View>
+          )}
 
-          {/* Status Pills */}
           <View style={styles.pillsRow}>
             <View style={styles.pill}>
-              <Ionicons name="sparkles-outline" size={14} color={colors.text} />
-
-              <Text style={styles.pillText}>Recognition confidence: 92%</Text>
-            </View>
-
-            <View style={styles.pill}>
               <Ionicons name="leaf-outline" size={14} color={colors.text} />
-
-              <Text style={styles.pillText}>100% Vegetarian</Text>
+              <Text style={styles.pillText}>{food.category.name}</Text>
             </View>
-          </View>
 
-          {/* Food Name */}
-          <View style={styles.foodNameRow}>
-            {editingName ? (
-              <TextInput
-                value={foodName}
-                onChangeText={setFoodName}
-                autoFocus
-                style={styles.foodNameInput}
-                onBlur={() => setEditingName(false)}
-                onSubmitEditing={() => setEditingName(false)}
-                returnKeyType="done"
-              />
-            ) : (
-              <Text style={styles.foodName}>{foodName}</Text>
+            {food.verified && (
+              <View style={styles.pill}>
+                <Ionicons
+                  name="checkmark-circle-outline"
+                  size={14}
+                  color={colors.text}
+                />
+                <Text style={styles.pillText}>Verified food</Text>
+              </View>
             )}
-
-            <Pressable
-              onPress={() => setEditingName((current) => !current)}
-              hitSlop={10}
-              style={styles.editButton}
-            >
-              <Ionicons name="pencil-outline" size={18} color={colors.icon} />
-            </Pressable>
           </View>
 
-          <Text style={styles.subtitle}>
-            Served with whole wheat roti · North Indian
-          </Text>
+          <View style={styles.foodNameRow}>
+            <Text style={styles.foodName}>{food.name}</Text>
+          </View>
 
-          {/* Nutrition Summary */}
+          {food.description && (
+            <Text style={styles.subtitle}>{food.description}</Text>
+          )}
+
           <View style={styles.nutritionCard}>
             <View style={styles.calorieSection}>
-              <Text style={styles.calorieValue}>620 kcal</Text>
+              <Text style={styles.calorieValue}>
+                {Math.round(nutrition?.calories ?? 0)} kcal
+              </Text>
 
-              <Text style={styles.calorieLabel}>Estimated Energy</Text>
-            </View>
-
-            <View style={styles.goalSection}>
-              <Text style={styles.goalValue}>31% of daily goal</Text>
-
-              <Text style={styles.goalLabel}>Target: 2,000 kcal / day</Text>
+              <Text style={styles.calorieLabel}>For {portion}g serving</Text>
             </View>
 
             <View style={styles.divider} />
@@ -156,28 +255,27 @@ export default function NutritionResultScreen() {
             <View style={styles.macrosRow}>
               <NutritionMacroCard
                 label="Protein"
-                value="28g"
-                progress={0.7}
+                value={`${nutrition?.protein.toFixed(1) ?? "0"}g`}
+                progress={Math.min((nutrition?.protein ?? 0) / 40, 1)}
                 indicatorColor="#4A90E2"
               />
 
               <NutritionMacroCard
                 label="Carbs"
-                value="42g"
-                progress={0.58}
+                value={`${nutrition?.carbs.toFixed(1) ?? "0"}g`}
+                progress={Math.min((nutrition?.carbs ?? 0) / 60, 1)}
                 indicatorColor="#63A66A"
               />
 
               <NutritionMacroCard
                 label="Fat"
-                value="36g"
-                progress={0.51}
+                value={`${nutrition?.fat.toFixed(1) ?? "0"}g`}
+                progress={Math.min((nutrition?.fat ?? 0) / 40, 1)}
                 indicatorColor="#D9A441"
               />
             </View>
           </View>
 
-          {/* Portion */}
           <View style={styles.portionSection}>
             <PortionSizeCard
               portion={portion}
@@ -188,7 +286,36 @@ export default function NutritionResultScreen() {
             />
           </View>
 
-          {/* Estimation Explanation */}
+          <View style={styles.mealTypeSection}>
+            <Text style={styles.mealTypeTitle}>MEAL TYPE</Text>
+
+            <View style={styles.mealTypeGrid}>
+              {MEAL_TYPES.map((meal) => {
+                const selected = selectedMealType === meal.value;
+
+                return (
+                  <Pressable
+                    key={meal.value}
+                    onPress={() => setSelectedMealType(meal.value)}
+                    style={[
+                      styles.mealTypeButton,
+                      selected && styles.mealTypeButtonSelected,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.mealTypeText,
+                        selected && styles.mealTypeTextSelected,
+                      ]}
+                    >
+                      {meal.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
           <Pressable
             style={styles.explanationHeader}
             onPress={() => setShowExplainability(true)}
@@ -200,9 +327,7 @@ export default function NutritionResultScreen() {
                 color={colors.secondaryText}
               />
 
-              <Text style={styles.explanationTitle}>
-                How was this estimated?
-              </Text>
+              <Text style={styles.explanationTitle}>Nutrition information</Text>
             </View>
 
             <Ionicons
@@ -212,16 +337,19 @@ export default function NutritionResultScreen() {
             />
           </Pressable>
 
-          {/* Actions */}
           <View style={styles.actions}>
-            <Button title="✓  Add to Daily Log" onPress={handleSaveToLog} />
+            <Button
+              title={isSaving ? "Adding..." : "✓  Add to Daily Log"}
+              onPress={handleSaveToLog}
+            />
 
             <Pressable
               style={styles.secondaryButton}
-              onPress={() => router.push("/main/scan")}
+              onPress={() => router.back()}
+              disabled={isSaving}
             >
               <Text style={styles.secondaryButtonText}>
-                Update Ingredients or Retake
+                Choose Another Food
               </Text>
             </Pressable>
           </View>
@@ -444,6 +572,94 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     fontSize: 15,
     fontWeight: "600",
+    color: colors.text,
+  },
+
+  loadingScreen: {
+    flex: 1,
+    backgroundColor: colors.background,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  loadingText: {
+    marginTop: 10,
+    fontSize: 14,
+    color: colors.secondaryText,
+  },
+
+  headerButtonPlaceholder: {
+    width: 42,
+    height: 42,
+  },
+
+  imageFallback: {
+    width: "100%",
+    height: 270,
+    borderRadius: 22,
+    backgroundColor: "#DDD8D2",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  mealTypeSection: {
+    marginTop: 22,
+  },
+
+  mealTypeTitle: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.8,
+    color: "#737373",
+    marginBottom: 10,
+  },
+
+  mealTypeGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+
+  mealTypeButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 15,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+
+  mealTypeButtonSelected: {
+    backgroundColor: colors.text,
+    borderColor: colors.text,
+  },
+
+  mealTypeText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.text,
+  },
+
+  mealTypeTextSelected: {
+    color: colors.white,
+  },
+
+  backToSearchButton: {
+    marginTop: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: colors.text,
+  },
+
+  backToSearchText: {
+    color: colors.white,
+    fontWeight: "600",
+  },
+
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "700",
     color: colors.text,
   },
 });

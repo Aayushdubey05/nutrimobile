@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Pressable,
   SafeAreaView,
@@ -16,221 +17,216 @@ import FoodSearchBar from "../../src/features/food/components/FoodSearchBar";
 import FoodSearchResult, {
   FoodItemData,
 } from "../../src/features/food/components/FoodSearchResult";
-
-const INDIAN_VEG_FOODS: FoodItemData[] = [
-  {
-    id: "1",
-    name: "Paneer Tikka",
-    category: "Indian",
-    caloriesPer100g: 265,
-    macros: { protein: 18, carbs: 6, fat: 20 },
-    imageUri:
-      "https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?auto=format&fit=crop&w=300&q=80",
-  },
-  {
-    id: "2",
-    name: "Palak Paneer",
-    category: "Indian",
-    caloriesPer100g: 180,
-    macros: { protein: 12, carbs: 8, fat: 11 },
-    imageUri:
-      "https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=300&q=80",
-  },
-  {
-    id: "3",
-    name: "Dal Tadka",
-    category: "Indian",
-    caloriesPer100g: 130,
-    macros: { protein: 7, carbs: 18, fat: 4 },
-    imageUri:
-      "https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=300&q=80",
-  },
-  {
-    id: "4",
-    name: "Roti",
-    category: "Indian",
-    caloriesPer100g: 297,
-    macros: { protein: 10, carbs: 52, fat: 3 },
-    imageUri:
-      "https://images.unsplash.com/photo-1626074353765-517a681e40be?auto=format&fit=crop&w=300&q=80",
-  },
-  {
-    id: "5",
-    name: "Basmati Rice",
-    category: "Indian",
-    caloriesPer100g: 130,
-    macros: { protein: 3, carbs: 28, fat: 0.4 },
-    imageUri:
-      "https://images.unsplash.com/photo-1516714435131-44d6b64dc6a2?auto=format&fit=crop&w=300&q=80",
-  },
-];
-
-const DEFAULT_RECENT = ["Paneer", "Roti", "Dal Tadka", "Basmati Rice"];
+import { foodService } from "../../src/features/food/services/foodService";
+import { Food } from "../../src/features/food/types";
 
 export default function ManualEntryScreen() {
   const [search, setSearch] = useState("");
-  const [recentSearches, setRecentSearches] = useState<string[]>(DEFAULT_RECENT);
+  const [foods, setFoods] = useState<Food[]>([]);
+  const [recentFoods, setRecentFoods] = useState<Food[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredFoods = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) return INDIAN_VEG_FOODS;
-    return INDIAN_VEG_FOODS.filter(
-      (f) =>
-        f.name.toLowerCase().includes(query) ||
-        f.category.toLowerCase().includes(query)
-    );
+  useEffect(() => {
+    loadRecentFoods();
+  }, []);
+
+  useEffect(() => {
+    const trimmedSearch = search.trim();
+
+    if (!trimmedSearch) {
+      setFoods([]);
+      setError(null);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      searchFoods(trimmedSearch);
+    }, 300);
+
+    return () => clearTimeout(timeout);
   }, [search]);
 
-  const handleSelectRecent = (chip: string) => {
-    setSearch(chip);
+  const loadRecentFoods = async () => {
+    try {
+      const data = await foodService.getRecentFoods();
+      setRecentFoods(data);
+    } catch {
+      // Recent searches are optional.
+      setRecentFoods([]);
+    }
   };
 
-  const handleClearRecent = () => {
-    setRecentSearches([]);
+  const searchFoods = async (name: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const data = await foodService.searchFoods(name);
+      setFoods(data);
+    } catch {
+      setFoods([]);
+      setError("Unable to search food. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleAddCustomFood = () => {
-    Alert.alert(
-      "Add Custom Food",
-      "Enter custom food details to add it to your log.",
-      [{ text: "OK" }]
-    );
+  const handleSelectFood = async (food: Food) => {
+    try {
+      await foodService.recordSearch(food.id);
+
+      router.push({
+        pathname: "/main/nutrition-result",
+        params: {
+          foodId: String(food.id),
+        },
+      });
+    } catch {
+      Alert.alert(
+        "Unable to continue",
+        "Could not select this food. Please try again.",
+      );
+    }
   };
 
-  const handleAddFoodItem = (food: FoodItemData) => {
-    Alert.alert("Food Selected", `${food.name} added to your log!`, [
-      { text: "View Results", onPress: () => router.push("/main/nutrition-result") },
-      { text: "OK" },
-    ]);
+  const handleClear = () => {
+    setSearch("");
+    setFoods([]);
+    setError(null);
   };
+
+  const mapFoodToResult = (food: Food): FoodItemData => ({
+    id: food.id,
+    name: food.name,
+    category: food.category.name,
+    caloriesPer100g: food.nutrition?.caloriesKcal ?? 0,
+    macros: {
+      protein: food.nutrition?.proteinG ?? 0,
+      carbs: food.nutrition?.carbohydratesG ?? 0,
+      fat: food.nutrition?.fatG ?? 0,
+    },
+    imageUri: food.imageUrl ?? undefined,
+  });
+
+  const displayedFoods = search.trim() ? foods : recentFoods;
 
   return (
     <View style={styles.screen}>
       <SafeAreaView style={styles.safeArea}>
-        {/* Header */}
         <View style={styles.header}>
-          {/* Left Circular Back Button */}
           <Pressable
-            style={({ pressed }) => [
-              styles.backButton,
-              pressed && styles.buttonPressed,
-            ]}
+            style={styles.headerButton}
             onPress={() => router.back()}
+            hitSlop={8}
           >
-            <Ionicons name="chevron-back" size={22} color={colors.text} />
+            <Ionicons name="chevron-back" size={23} color={colors.text} />
           </Pressable>
 
-          {/* Right Small Rounded "+ Custom Food" Button */}
-          <Pressable
-            style={({ pressed }) => [
-              styles.customFoodButton,
-              pressed && styles.buttonPressed,
-            ]}
-            onPress={handleAddCustomFood}
-          >
-            <Ionicons name="add" size={15} color={colors.text} />
-            <Text style={styles.customFoodText}>Custom Food</Text>
-          </Pressable>
+          <Text style={styles.headerTitle}>Add Food</Text>
+
+          <View style={styles.headerButtonPlaceholder} />
         </View>
 
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.content}
         >
-          {/* Main Title & Subtitle */}
-          <View style={styles.intro}>
-            <Text style={styles.title}>Search food</Text>
-            <Text style={styles.subtitle}>
-              Search Indian vegetarian foods by name or portion.
-            </Text>
-          </View>
-
-          {/* Search Bar */}
           <FoodSearchBar
             value={search}
             onChangeText={setSearch}
-            onClear={() => setSearch("")}
-            placeholder="Search food..."
+            onClear={handleClear}
           />
 
-          {/* Recent Searches Section */}
-          {recentSearches.length > 0 && (
+          {!search.trim() && recentFoods.length > 0 && (
             <View style={styles.recentSection}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionTitleText}>RECENT SEARCHES</Text>
-                <Pressable onPress={handleClearRecent}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>RECENT SEARCHES</Text>
+
+                <Pressable onPress={() => setRecentFoods([])} hitSlop={8}>
                   <Text style={styles.clearText}>Clear</Text>
                 </Pressable>
               </View>
 
-              <View style={styles.chipsRow}>
-                {recentSearches.map((chip) => (
+              <View style={styles.recentChips}>
+                {recentFoods.slice(0, 6).map((food) => (
                   <Pressable
-                    key={chip}
-                    style={({ pressed }) => [
-                      styles.chip,
-                      search === chip && styles.activeChip,
-                      pressed && styles.buttonPressed,
-                    ]}
-                    onPress={() => handleSelectRecent(chip)}
+                    key={food.id}
+                    style={styles.recentChip}
+                    onPress={() => setSearch(food.name)}
                   >
-                    <Text
-                      style={[
-                        styles.chipText,
-                        search === chip && styles.activeChipText,
-                      ]}
-                    >
-                      {chip}
-                    </Text>
+                    <Text style={styles.recentChipText}>{food.name}</Text>
                   </Pressable>
                 ))}
               </View>
             </View>
           )}
 
-          {/* Results Section */}
-          <View style={styles.resultsSection}>
-            <Text style={styles.resultsCountText}>
-              RESULTS ({filteredFoods.length})
-            </Text>
+          {isLoading && (
+            <View style={styles.centerState}>
+              <ActivityIndicator size="small" color={colors.text} />
+              <Text style={styles.stateText}>Searching food...</Text>
+            </View>
+          )}
 
-            {filteredFoods.length > 0 ? (
-              filteredFoods.map((food) => (
-                <FoodSearchResult
-                  key={food.id}
-                  food={food}
-                  onPress={() => handleAddFoodItem(food)}
-                  onAdd={() => handleAddFoodItem(food)}
-                />
-              ))
-            ) : (
-              <View style={styles.emptyState}>
-                <Ionicons name="search-outline" size={28} color="#9CA3AF" />
-                <Text style={styles.emptyTitle}>No foods found</Text>
-                <Text style={styles.emptyText}>
-                  Try searching with a different food name or add custom food.
-                </Text>
+          {!isLoading && error && (
+            <View style={styles.centerState}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
+
+          {!isLoading &&
+            !error &&
+            search.trim() &&
+            displayedFoods.length === 0 && (
+              <View style={styles.centerState}>
+                <Text style={styles.emptyTitle}>No food found</Text>
+                <Text style={styles.stateText}>Try another food name.</Text>
               </View>
             )}
-          </View>
 
-          {/* Bottom Fallback Card */}
-          <View style={styles.fallbackCard}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.fallbackTitle}>Can't find your food?</Text>
-            </View>
-            <Pressable
-              style={({ pressed }) => [
-                styles.fallbackActionButton,
-                pressed && styles.buttonPressed,
-              ]}
-              onPress={handleAddCustomFood}
-            >
-              <Text style={styles.fallbackActionText}>
-                Add custom food manually
+          {!isLoading && !error && displayedFoods.length > 0 && (
+            <View style={styles.resultsSection}>
+              <Text style={styles.sectionTitle}>
+                {search.trim() ? "SEARCH RESULTS" : "RECENT FOODS"}
               </Text>
-            </Pressable>
-          </View>
+
+              {displayedFoods.map((food) => (
+                <FoodSearchResult
+                  key={food.id}
+                  food={mapFoodToResult(food)}
+                  onPress={() => handleSelectFood(food)}
+                  onAdd={() => handleSelectFood(food)}
+                />
+              ))}
+            </View>
+          )}
+
+          <Pressable
+            style={styles.customFoodButton}
+            onPress={() =>
+              Alert.alert(
+                "Custom Food",
+                "Custom food entry will be available soon.",
+              )
+            }
+          >
+            <Ionicons name="add-circle-outline" size={20} color={colors.text} />
+
+            <View style={styles.customFoodTextContainer}>
+              <Text style={styles.customFoodTitle}>Can't find your food?</Text>
+
+              <Text style={styles.customFoodSubtitle}>
+                Add a custom food manually
+              </Text>
+            </View>
+
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color={colors.secondaryText}
+            />
+          </Pressable>
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -271,16 +267,16 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
 
-  customFoodButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-  },
+  // customFoodButton: {
+  //   flexDirection: "row",
+  //   alignItems: "center",
+  //   backgroundColor: colors.white,
+  //   borderWidth: 1,
+  //   borderColor: "#E5E7EB",
+  //   borderRadius: 16,
+  //   paddingHorizontal: 12,
+  //   paddingVertical: 7,
+  // },
 
   customFoodText: {
     fontSize: 12,
@@ -331,11 +327,11 @@ const styles = StyleSheet.create({
     color: "#737373",
   },
 
-  clearText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#6B7280",
-  },
+  // clearText: {
+  //   fontSize: 12,
+  //   fontWeight: "600",
+  //   color: "#6B7280",
+  // },
 
   chipsRow: {
     flexDirection: "row",
@@ -440,5 +436,114 @@ const styles = StyleSheet.create({
     opacity: 0.8,
     transform: [{ scale: 0.98 }],
   },
-});
 
+  headerButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  headerButtonPlaceholder: {
+    width: 42,
+    height: 42,
+  },
+
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: colors.text,
+  },
+
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.8,
+    color: "#737373",
+    marginBottom: 10,
+  },
+
+  clearText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.secondaryText,
+  },
+
+  recentChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+
+  recentChip: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+
+  recentChipText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: colors.text,
+  },
+
+  centerState: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 30,
+  },
+
+  stateText: {
+    fontSize: 13,
+    color: colors.secondaryText,
+    marginTop: 8,
+  },
+
+  errorText: {
+    fontSize: 13,
+    color: "#B91C1C",
+    textAlign: "center",
+  },
+
+  customFoodButton: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 18,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+  },
+
+  customFoodTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+
+  customFoodTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.text,
+  },
+
+  customFoodSubtitle: {
+    fontSize: 12,
+    color: colors.secondaryText,
+    marginTop: 3,
+  },
+});

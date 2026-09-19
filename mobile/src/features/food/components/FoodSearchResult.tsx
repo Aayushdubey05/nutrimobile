@@ -4,7 +4,7 @@ import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { colors } from "../../../constants/colors";
 
 export interface FoodItemData {
-  id: string;
+  id: number;
   name: string;
   category: string;
   caloriesPer100g: number;
@@ -62,9 +62,7 @@ export default function FoodSearchResult({
         </View>
 
         {/* Calories / 100g & Macro Summary */}
-        <Text style={styles.calorieText}>
-          {caloriesPer100g} kcal / 100g
-        </Text>
+        <Text style={styles.calorieText}>{caloriesPer100g} kcal / 100g</Text>
         <Text style={styles.macroText}>
           P: {macros.protein}g • C: {macros.carbs}g • F: {macros.fat}g
         </Text>
@@ -190,4 +188,3 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.95 }],
   },
 });
-

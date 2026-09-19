@@ -14,14 +14,23 @@ export const ENDPOINTS = {
   DIETARY_RESTRICTIONS: "/dietary-restrictions",
   HEALTH_CONDITIONS: "/health-conditions",
 
-  NUTRITION: {
-    TARGET: "/nutrition/target",
-    CALCULATE_TARGET: "/nutrition/target/calculate",
-    DAILY: (date: string) => `/nutrition/daily/${date}`,
+  FOODS: {
+    LIST: "/foods",
+    BY_ID: (foodId: number) => `/foods/${foodId}`,
+    SEARCH: (name: string) => `/foods/search?name=${encodeURIComponent(name)}`,
+    RECENT: "/foods/recent",
+    RECORD_SEARCH: (foodId: number) => `/foods/${foodId}/search`,
   },
 
   MEALS: {
     LIST: "/meals",
+    CREATE: "/meals",
     BY_DATE: (date: string) => `/meals/date/${date}`,
+  },
+
+  NUTRITION: {
+    TARGET: "/nutrition/target",
+    CALCULATE_TARGET: "/nutrition/target/calculate",
+    DAILY: (date: string) => `/nutrition/daily/${date}`,
   },
 } as const;
