@@ -125,10 +125,36 @@ export default function SegmentationReviewScreen() {
       return;
     }
 
+    const selectedSegment = segments.find(
+      (segment) => confirmedIds[segment.id] !== false,
+    );
+
+    if (!selectedSegment) {
+      Alert.alert(
+        "No food selected",
+        "Please confirm at least one detected food before continuing.",
+      );
+      return;
+    }
+
+    const analysisItem = analysis.items.find(
+      (item) => String(item.id) === selectedSegment.id,
+    );
+
+    if (!analysisItem) {
+      Alert.alert(
+        "Food unavailable",
+        "Could not find the selected food in this analysis.",
+      );
+      return;
+    }
+
     router.push({
       pathname: "/main/nutrition-result",
       params: {
         analysisId: String(analysis.id),
+        foodId: String(analysisItem.finalFoodId ?? analysisItem.foodId),
+        weightG: String(analysisItem.finalWeightG),
       },
     });
   };

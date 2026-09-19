@@ -19,8 +19,8 @@ import { colors } from "../../src/constants/colors";
 import NutritionMacroCard from "../../src/features/nutrition/components/NutritionMacroCard";
 import PortionSizeCard from "../../src/features/nutrition/components/PortionSizeCard";
 import { foodService } from "../../src/features/food/services/foodService";
-import { Food } from "../../src/features/food/types";
-import { MealType } from "../../src/features/meal/types";
+import type { Food } from "../../src/features/food/types";
+import type { MealType } from "../../src/features/meal/types";
 import { mealService } from "../../src/features/meal/services/mealService";
 
 const MEAL_TYPES: { label: string; value: MealType }[] = [
@@ -32,20 +32,43 @@ const MEAL_TYPES: { label: string; value: MealType }[] = [
 ];
 
 export default function NutritionResultScreen() {
-  const { foodId } = useLocalSearchParams<{ foodId?: string }>();
+  const { analysisId, foodId, weightG } = useLocalSearchParams<{
+    analysisId?: string;
+    foodId?: string;
+    weightG?: string;
+  }>();
 
   const [food, setFood] = useState<Food | null>(null);
-  const [portion, setPortion] = useState(100);
-  const [selectedPreset, setSelectedPreset] = useState(100);
+
+  const initialWeight = Number(weightG) || 100;
+
+  const [portion, setPortion] = useState(initialWeight);
+  const [selectedPreset, setSelectedPreset] = useState(
+    [100, 150, 200, 250].includes(initialWeight) ? initialWeight : 0,
+  );
+
   const [selectedMealType, setSelectedMealType] = useState<MealType>("OTHER");
 
   const [showExplainability, setShowExplainability] = useState(false);
+
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!foodId) {
       setIsLoading(false);
+
+      Alert.alert(
+        "Food unavailable",
+        "No food was selected for this analysis.",
+        [
+          {
+            text: "Go Back",
+            onPress: () => router.back(),
+          },
+        ],
+      );
+
       return;
     }
 
@@ -164,7 +187,8 @@ export default function NutritionResultScreen() {
     return (
       <View style={styles.loadingScreen}>
         <ActivityIndicator size="large" color={colors.text} />
-        <Text style={styles.loadingText}>Loading food...</Text>
+
+        <Text style={styles.loadingText}>Loading nutrition...</Text>
       </View>
     );
   }
@@ -218,6 +242,7 @@ export default function NutritionResultScreen() {
           <View style={styles.pillsRow}>
             <View style={styles.pill}>
               <Ionicons name="leaf-outline" size={14} color={colors.text} />
+
               <Text style={styles.pillText}>{food.category.name}</Text>
             </View>
 
@@ -228,6 +253,7 @@ export default function NutritionResultScreen() {
                   size={14}
                   color={colors.text}
                 />
+
                 <Text style={styles.pillText}>Verified food</Text>
               </View>
             )}
@@ -406,6 +432,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#DDD8D2",
   },
 
+  imageFallback: {
+    width: "100%",
+    height: 270,
+    borderRadius: 22,
+    backgroundColor: "#DDD8D2",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
   pillsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -445,29 +480,6 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
 
-  foodNameInput: {
-    flex: 1,
-    minHeight: 42,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.text,
-    fontSize: 27,
-    fontWeight: "700",
-    color: colors.text,
-    paddingVertical: 2,
-  },
-
-  editButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: 10,
-  },
-
   subtitle: {
     fontSize: 14,
     lineHeight: 21,
@@ -501,22 +513,6 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
 
-  goalSection: {
-    marginTop: 18,
-  },
-
-  goalValue: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.text,
-  },
-
-  goalLabel: {
-    fontSize: 12,
-    color: colors.secondaryText,
-    marginTop: 4,
-  },
-
   divider: {
     height: 1,
     backgroundColor: colors.border,
@@ -530,6 +526,48 @@ const styles = StyleSheet.create({
 
   portionSection: {
     marginTop: 16,
+  },
+
+  mealTypeSection: {
+    marginTop: 22,
+  },
+
+  mealTypeTitle: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.8,
+    color: "#737373",
+    marginBottom: 10,
+  },
+
+  mealTypeGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+
+  mealTypeButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 15,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+
+  mealTypeButtonSelected: {
+    backgroundColor: colors.text,
+    borderColor: colors.text,
+  },
+
+  mealTypeText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.text,
+  },
+
+  mealTypeTextSelected: {
+    color: colors.white,
   },
 
   explanationHeader: {
@@ -591,57 +629,6 @@ const styles = StyleSheet.create({
   headerButtonPlaceholder: {
     width: 42,
     height: 42,
-  },
-
-  imageFallback: {
-    width: "100%",
-    height: 270,
-    borderRadius: 22,
-    backgroundColor: "#DDD8D2",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  mealTypeSection: {
-    marginTop: 22,
-  },
-
-  mealTypeTitle: {
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 0.8,
-    color: "#737373",
-    marginBottom: 10,
-  },
-
-  mealTypeGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-
-  mealTypeButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 15,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-
-  mealTypeButtonSelected: {
-    backgroundColor: colors.text,
-    borderColor: colors.text,
-  },
-
-  mealTypeText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: colors.text,
-  },
-
-  mealTypeTextSelected: {
-    color: colors.white,
   },
 
   backToSearchButton: {
