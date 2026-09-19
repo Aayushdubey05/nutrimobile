@@ -16,58 +16,55 @@ import { colors } from "../../src/constants/colors";
 import CalorieCard from "../../src/features/home/components/CalorieCard";
 import FoodSummaryCard from "../../src/features/home/components/FoodSummaryCard";
 import QuickAction from "../../src/features/home/components/QuickAction";
+import { useDashboard } from "../../src/features/home/hooks/useDashboard";
+import { useAuth } from "../../src/features/auth/hooks/useAuth";
 
-interface Meal {
-  id: string;
-  mealType: string;
-  time: string;
-  name: string;
-  calories: number;
-  imageUri: string;
+function formatMealTime(time: string): string {
+  const [hoursString, minutes] = time.split(":");
+
+  const hours = Number(hoursString);
+
+  const period = hours >= 12 ? "PM" : "AM";
+
+  const displayHours = hours % 12 || 12;
+
+  return `${displayHours}:${minutes} ${period}`;
 }
-
-const DEFAULT_MEALS: Meal[] = [
-  {
-    id: "1",
-    mealType: "BREAKFAST",
-    time: "8:30 AM",
-    name: "Avocado Toast with Poached Egg",
-    calories: 420,
-    imageUri:
-      "https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&w=300&q=80",
-  },
-  {
-    id: "2",
-    mealType: "LUNCH",
-    time: "1:15 PM",
-    name: "Quinoa Kale Salad Bowl",
-    calories: 560,
-    imageUri:
-      "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=300&q=80",
-  },
-  {
-    id: "3",
-    mealType: "SNACK",
-    time: "4:30 PM",
-    name: "Greek Yogurt with Berries",
-    calories: 260,
-    imageUri:
-      "https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=300&q=80",
-  },
-];
 
 export default function DashboardScreen() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [meals] = useState<Meal[]>(DEFAULT_MEALS);
+
+  const { user } = useAuth();
+
+  const { nutrition, meals, isLoading, error, refresh } = useDashboard();
 
   const filteredMeals = useMemo(() => {
-    if (!searchQuery.trim()) return meals;
-    return meals.filter(
-      (m) =>
-        m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        m.mealType.toLowerCase().includes(searchQuery.toLowerCase())
+    if (!searchQuery.trim()) {
+      return meals;
+    }
+
+    const query = searchQuery.toLowerCase();
+
+    return meals.filter((meal) =>
+      meal.items.some(
+        (item) =>
+          item.foodName.toLowerCase().includes(query) ||
+          meal.mealType.toLowerCase().includes(query),
+      ),
     );
   }, [meals, searchQuery]);
+
+  const consumedCalories = nutrition?.consumed.caloriesKcal ?? 0;
+  const targetCalories = nutrition?.target.caloriesKcal ?? 0;
+
+  const consumedProtein = nutrition?.consumed.proteinG ?? 0;
+  const targetProtein = nutrition?.target.proteinG ?? 0;
+
+  const consumedCarbs = nutrition?.consumed.carbohydratesG ?? 0;
+  const targetCarbs = nutrition?.target.carbohydratesG ?? 0;
+
+  const consumedFat = nutrition?.consumed.fatG ?? 0;
+  const targetFat = nutrition?.target.fatG ?? 0;
 
   return (
     <View style={styles.screen}>
@@ -75,11 +72,29 @@ export default function DashboardScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
+        {isLoading && (
+          <View style={styles.statusContainer}>
+            <Text style={styles.statusText}>Loading your nutrition...</Text>
+          </View>
+        )}
+
+        {error && !isLoading && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+
+            <Pressable style={styles.retryButton} onPress={refresh}>
+              <Text style={styles.retryButtonText}>Try Again</Text>
+            </Pressable>
+          </View>
+        )}
+
         {/* Top Header */}
         <View style={styles.topSection}>
           <View>
             <Text style={styles.appName}>NutriVision-3D</Text>
-            <Text style={styles.greeting}>Good morning, Ritesh 👋</Text>
+            <Text style={styles.greeting}>
+              Good morning, {user?.name ?? "there"} 👋
+            </Text>
             <Text style={styles.subtitle}>
               Let's track your nutrition today.
             </Text>
@@ -98,13 +113,27 @@ export default function DashboardScreen() {
         </View>
 
         {/* Nutrition Summary Card */}
-        <CalorieCard
-          consumed={1240}
-          target={2000}
-          protein={{ current: 72, target: 120, unit: "g" }}
-          carbs={{ current: 145, target: 250, unit: "g" }}
-          fat={{ current: 42, target: 65, unit: "g" }}
-        />
+        {nutrition && (
+          <CalorieCard
+            consumed={consumedCalories}
+            target={targetCalories}
+            protein={{
+              current: consumedProtein,
+              target: targetProtein,
+              unit: "g",
+            }}
+            carbs={{
+              current: consumedCarbs,
+              target: targetCarbs,
+              unit: "g",
+            }}
+            fat={{
+              current: consumedFat,
+              target: targetFat,
+              unit: "g",
+            }}
+          />
+        )}
 
         {/* Search Field */}
         <View style={styles.searchContainer}>
@@ -165,16 +194,29 @@ export default function DashboardScreen() {
         />
 
         {filteredMeals.length > 0 ? (
-          filteredMeals.map((meal) => (
-            <FoodSummaryCard
-              key={meal.id}
-              mealType={meal.mealType}
-              time={meal.time}
-              name={meal.name}
-              calories={meal.calories}
-              imageUri={meal.imageUri}
-            />
-          ))
+          filteredMeals.slice(0, 5).map((meal) => {
+            const mealName =
+              meal.items.length === 1
+                ? meal.items[0].foodName
+                : meal.items.length > 1
+                  ? `${meal.items[0].foodName} + ${meal.items.length - 1} more`
+                  : "Meal";
+
+            const calories = Math.round(meal.nutrition.caloriesKcal);
+
+            const time = formatMealTime(meal.mealTime);
+
+            return (
+              <FoodSummaryCard
+                key={meal.id}
+                mealType={meal.mealType}
+                time={time}
+                name={mealName}
+                calories={calories}
+                imageUri={meal.items[0]?.imageUrl ?? undefined}
+              />
+            );
+          })
         ) : (
           /* Empty State Variation */
           <View style={styles.emptyStateContainer}>
@@ -380,5 +422,43 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#FFFFFF",
   },
-});
+  statusContainer: {
+    paddingVertical: 20,
+    alignItems: "center",
+  },
 
+  statusText: {
+    fontSize: 14,
+    color: colors.secondaryText,
+  },
+
+  errorContainer: {
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    padding: 16,
+    marginBottom: 16,
+    alignItems: "center",
+  },
+
+  errorText: {
+    fontSize: 13,
+    color: "#B91C1C",
+    textAlign: "center",
+    marginBottom: 12,
+  },
+
+  retryButton: {
+    backgroundColor: "#171717",
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 10,
+  },
+
+  retryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+});

@@ -17,5 +17,11 @@ export const ENDPOINTS = {
   NUTRITION: {
     TARGET: "/nutrition/target",
     CALCULATE_TARGET: "/nutrition/target/calculate",
+    DAILY: (date: string) => `/nutrition/daily/${date}`,
+  },
+
+  MEALS: {
+    LIST: "/meals",
+    BY_DATE: (date: string) => `/meals/date/${date}`,
   },
 } as const;

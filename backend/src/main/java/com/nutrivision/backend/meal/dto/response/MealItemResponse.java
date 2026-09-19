@@ -7,6 +7,7 @@ public record MealItemResponse(
         Long foodId,
         Long customFoodId,
         String foodName,
+        String imageUrl,
         BigDecimal quantity,
         BigDecimal weightG,
         BigDecimal caloriesKcal,

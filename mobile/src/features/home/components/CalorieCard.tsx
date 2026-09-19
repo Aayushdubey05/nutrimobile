@@ -10,17 +10,17 @@ interface MacroData {
 interface CalorieCardProps {
   consumed: number;
   target: number;
-  protein?: MacroData;
-  carbs?: MacroData;
-  fat?: MacroData;
+  protein: MacroData;
+  carbs: MacroData;
+  fat: MacroData;
 }
 
 export default function CalorieCard({
-  consumed = 1240,
-  target = 2000,
-  protein = { current: 72, target: 120, unit: "g" },
-  carbs = { current: 145, target: 250, unit: "g" },
-  fat = { current: 42, target: 65, unit: "g" },
+  consumed,
+  target,
+  protein,
+  carbs,
+  fat,
 }: CalorieCardProps) {
   const calorieRatio = Math.min(Math.max(consumed / target, 0), 1);
 
@@ -38,9 +38,7 @@ export default function CalorieCard({
           />
           <View style={styles.ringInner}>
             <Text style={styles.calorieLabel}>CALORIES</Text>
-            <Text style={styles.calorieValue}>
-              {consumed.toLocaleString()}
-            </Text>
+            <Text style={styles.calorieValue}>{consumed.toLocaleString()}</Text>
             <Text style={styles.calorieTarget}>
               / {target.toLocaleString()} kcal
             </Text>
@@ -243,4 +241,3 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
 });
-

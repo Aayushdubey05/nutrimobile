@@ -422,11 +422,14 @@ public class MealService {
     private MealItemResponse toItemResponse(MealItem item) {
 
         String foodName;
+        String imageUrl;
 
         if (item.getFood() != null) {
             foodName = item.getFood().getName();
+            imageUrl = item.getFood().getImageUrl();
         } else {
             foodName = item.getCustomFood().getName();
+            imageUrl = item.getCustomFood().getImageUrl();
         }
 
         return new MealItemResponse(
@@ -438,6 +441,7 @@ public class MealService {
                         ? item.getCustomFood().getId()
                         : null,
                 foodName,
+                imageUrl,
                 item.getQuantity(),
                 item.getWeightG(),
                 item.getCaloriesKcal(),
