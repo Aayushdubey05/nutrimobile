@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import { useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Pressable,
   SafeAreaView,
@@ -17,16 +18,84 @@ import SegmentationPreview, {
   INITIAL_SEGMENTS,
   SegmentItem,
 } from "../../src/features/food/components/SegmentationPreview";
+import { analysisService } from "../../src/features/analysis/services/analysisService";
+import type { FoodAnalysisResponse } from "../../src/features/analysis/types";
 
 export default function SegmentationReviewScreen() {
+  const { analysisId } = useLocalSearchParams<{
+    analysisId?: string;
+  }>();
+
+  const [analysis, setAnalysis] = useState<FoodAnalysisResponse | null>(null);
+
   const [segments, setSegments] = useState<SegmentItem[]>(INITIAL_SEGMENTS);
-  const [confirmedIds, setConfirmedIds] = useState<Record<string, boolean>>({
-    paneer: true,
-    roti: true,
-    dal: true,
-    rice: true,
-    salad: true,
-  });
+
+  const [confirmedIds, setConfirmedIds] = useState<Record<string, boolean>>({});
+
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadAnalysis();
+  }, [analysisId]);
+
+  const loadAnalysis = async () => {
+    if (!analysisId) {
+      Alert.alert("Analysis missing", "No analysis ID was provided.", [
+        {
+          text: "Go Back",
+          onPress: () => router.back(),
+        },
+      ]);
+
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const data = await analysisService.getAnalysis(Number(analysisId));
+
+      setAnalysis(data);
+
+      const backendSegments: SegmentItem[] = data.items.map((item, index) => ({
+        id: String(item.id),
+        name: item.finalFoodName || item.detectedName,
+        weight: `~${Math.round(Number(item.finalWeightG))}g`,
+        description: `${Math.round(Number(item.confidence) * 100)}% confidence`,
+        color: getSegmentColor(index),
+        maskColor: getSegmentMaskColor(index),
+        bgColor: getSegmentBackgroundColor(index),
+        position: getSegmentPosition(index),
+      }));
+
+      setSegments(backendSegments);
+
+      const initialConfirmed: Record<string, boolean> = {};
+
+      data.items.forEach((item) => {
+        initialConfirmed[String(item.id)] = true;
+      });
+
+      setConfirmedIds(initialConfirmed);
+    } catch (error: any) {
+      console.error("Failed to load analysis:", error);
+
+      Alert.alert(
+        "Unable to load analysis",
+        error?.response?.data?.message ||
+          error?.message ||
+          "Something went wrong.",
+        [
+          {
+            text: "Go Back",
+            onPress: () => router.back(),
+          },
+        ],
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleToggleConfirm = (id: string) => {
     setConfirmedIds((prev) => ({
@@ -36,7 +105,7 @@ export default function SegmentationReviewScreen() {
   };
 
   const handleRemoveSegment = (id: string) => {
-    setSegments((prev) => prev.filter((s) => s.id !== id));
+    setSegments((prev) => prev.filter((segment) => segment.id !== id));
   };
 
   const handleAddItem = () => {
@@ -47,16 +116,37 @@ export default function SegmentationReviewScreen() {
     Alert.alert(
       "Merge Segments",
       "Select segments to merge into a single portion.",
-      [{ text: "OK" }]
+      [{ text: "OK" }],
     );
   };
+
+  const handleContinue = () => {
+    if (!analysis) {
+      return;
+    }
+
+    router.push({
+      pathname: "/main/nutrition-result",
+      params: {
+        analysisId: String(analysis.id),
+      },
+    });
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingScreen}>
+        <ActivityIndicator size="large" color={colors.text} />
+        <Text style={styles.loadingText}>Loading food analysis...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.screen}>
       <SafeAreaView style={styles.safeArea}>
         {/* Header */}
         <View style={styles.header}>
-          {/* Circular Back Button */}
           <Pressable
             style={({ pressed }) => [
               styles.backButton,
@@ -67,10 +157,8 @@ export default function SegmentationReviewScreen() {
             <Ionicons name="chevron-back" size={22} color={colors.text} />
           </Pressable>
 
-          {/* Center Small Step Text */}
           <Text style={styles.stepText}>STEP 2 OF 3</Text>
 
-          {/* Right Rounded "+ Add Item" Button */}
           <Pressable
             style={({ pressed }) => [
               styles.addItemButton,
@@ -87,9 +175,9 @@ export default function SegmentationReviewScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.content}
         >
-          {/* Main Heading & Subtitle */}
           <View style={styles.intro}>
             <Text style={styles.title}>Review your food</Text>
+
             <Text style={styles.subtitle}>
               We detected these food items. Check before continuing.
             </Text>
@@ -97,10 +185,11 @@ export default function SegmentationReviewScreen() {
 
           {segments.length > 0 ? (
             <>
-              {/* Segmentation Image with Translucent Masks & Direct Pill Labels */}
-              <SegmentationPreview items={segments} />
+              <SegmentationPreview
+                items={segments}
+                imageUri={analysis?.imageUrl}
+              />
 
-              {/* Detected Portions Header & Merge Action */}
               <View style={styles.portionsHeader}>
                 <Text style={styles.portionsTitle}>
                   DETECTED PORTIONS ({segments.length})
@@ -119,11 +208,11 @@ export default function SegmentationReviewScreen() {
                     color="#6B7280"
                     style={{ marginRight: 4 }}
                   />
+
                   <Text style={styles.mergeText}>Merge Segments</Text>
                 </Pressable>
               </View>
 
-              {/* Vertical List of Food-Item Cards */}
               <View style={styles.cardsList}>
                 {segments.map((item) => (
                   <FoodDetectionCard
@@ -139,13 +228,13 @@ export default function SegmentationReviewScreen() {
                 ))}
               </View>
 
-              {/* Fallback Card */}
               <View style={styles.fallbackCard}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.fallbackTitle}>
                     We couldn't detect separate food items?
                   </Text>
                 </View>
+
                 <Pressable
                   style={({ pressed }) => [
                     styles.fallbackActionButton,
@@ -159,14 +248,13 @@ export default function SegmentationReviewScreen() {
                 </Pressable>
               </View>
 
-              {/* Primary Large Black Button */}
               <View style={styles.bottomButtonContainer}>
                 <Pressable
                   style={({ pressed }) => [
                     styles.primaryButton,
                     pressed && styles.buttonPressed,
                   ]}
-                  onPress={() => router.push("/main/nutrition-result")}
+                  onPress={handleContinue}
                 >
                   <Text style={styles.primaryButtonText}>
                     Looks good, Continue →
@@ -175,22 +263,27 @@ export default function SegmentationReviewScreen() {
               </View>
             </>
           ) : (
-            /* Empty Detection State */
             <View style={styles.emptyStateContainer}>
               <View style={styles.emptyIconBadge}>
                 <Ionicons name="search-outline" size={32} color="#737373" />
               </View>
+
               <Text style={styles.emptyTitle}>No food items found</Text>
+
               <Text style={styles.emptySubtitle}>
                 Try another photo or enter food manually.
               </Text>
+
               <View style={styles.emptyActionsRow}>
                 <Pressable
                   style={styles.emptySecondaryButton}
                   onPress={() => router.back()}
                 >
-                  <Text style={styles.emptySecondaryText}>Try Another Photo</Text>
+                  <Text style={styles.emptySecondaryText}>
+                    Try Another Photo
+                  </Text>
                 </Pressable>
+
                 <Pressable
                   style={styles.emptyPrimaryButton}
                   onPress={handleAddItem}
@@ -206,6 +299,79 @@ export default function SegmentationReviewScreen() {
   );
 }
 
+/*
+ * Temporary visual helpers.
+ *
+ * Backend currently does not return segmentation coordinates/colors.
+ * These are only used to preserve your current UI.
+ */
+
+function getSegmentColor(index: number): string {
+  const colorsList = ["#EF4444", "#F59E0B", "#EAB308", "#3B82F6", "#10B981"];
+
+  return colorsList[index % colorsList.length];
+}
+
+function getSegmentMaskColor(index: number): string {
+  const colorsList = [
+    "rgba(239, 68, 68, 0.35)",
+    "rgba(245, 158, 11, 0.35)",
+    "rgba(234, 179, 8, 0.35)",
+    "rgba(59, 130, 246, 0.35)",
+    "rgba(16, 185, 129, 0.35)",
+  ];
+
+  return colorsList[index % colorsList.length];
+}
+
+function getSegmentBackgroundColor(index: number): string {
+  const colorsList = ["#FEF2F2", "#FFFBEB", "#FEFCE8", "#EFF6FF", "#ECFDF5"];
+
+  return colorsList[index % colorsList.length];
+}
+
+function getSegmentPosition(index: number): SegmentItem["position"] {
+  const positions: SegmentItem["position"][] = [
+    {
+      top: "14%",
+      left: "10%",
+      width: "36%",
+      height: "36%",
+      borderRadius: 45,
+    },
+    {
+      top: "12%",
+      right: "10%",
+      width: "38%",
+      height: "36%",
+      borderRadius: 50,
+    },
+    {
+      bottom: "12%",
+      left: "8%",
+      width: "32%",
+      height: "34%",
+      borderRadius: 40,
+    },
+    {
+      bottom: "14%",
+      left: "38%",
+      width: "32%",
+      height: "34%",
+      borderRadius: 40,
+    },
+    {
+      bottom: "16%",
+      right: "6%",
+      width: "24%",
+      height: "30%",
+      borderRadius: 35,
+    },
+  ];
+
+  return positions[index % positions.length];
+}
+
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
@@ -214,6 +380,19 @@ const styles = StyleSheet.create({
 
   safeArea: {
     flex: 1,
+  },
+
+  loadingScreen: {
+    flex: 1,
+    backgroundColor: colors.background,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: colors.secondaryText,
   },
 
   header: {
@@ -449,4 +628,3 @@ const styles = StyleSheet.create({
     color: colors.white,
   },
 });
-

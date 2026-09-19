@@ -1,26 +1,86 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import {
+  Alert,
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 import { colors } from "../../src/constants/colors";
 import CameraFrame from "../../src/features/food/components/CameraFrame";
 import CameraTip from "../../src/features/food/components/CameraTip";
+import { analysisService } from "../../src/features/analysis/services/analysisService";
 
 export default function ScanScreen() {
+  const [loading, setLoading] = useState(false);
+
+  const handleCapture = async () => {
+    if (loading) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      /*
+       * Temporary image URL.
+       *
+       * This is only for frontend/backend integration testing.
+       * Later this will be replaced by the actual captured image
+       * uploaded to your backend/storage.
+       */
+      const imageUrl =
+        "https://images.unsplash.com/photo-1610192244261-3f33de3f55e4?auto=format&fit=crop&w=900&q=85";
+
+      const analysis = await analysisService.createAnalysis({
+        imageUrl,
+      });
+
+      router.push({
+        pathname: "/main/segmentation-review",
+        params: {
+          analysisId: String(analysis.id),
+        },
+      });
+    } catch (error: any) {
+      console.error("Analysis creation failed:", error);
+
+      Alert.alert(
+        "Analysis failed",
+        error?.response?.data?.message ||
+          error?.message ||
+          "Unable to analyze the food image.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <View style={styles.screen}>
-      {/* Mock camera preview */}
       <View style={styles.cameraPreview}>
         <SafeAreaView style={styles.safeArea}>
           {/* Header */}
           <View style={styles.header}>
-            <Pressable style={styles.iconButton} onPress={() => router.back()}>
+            <Pressable
+              style={styles.iconButton}
+              onPress={() => router.back()}
+              disabled={loading}
+            >
               <Ionicons name="chevron-back" size={25} color={colors.white} />
             </Pressable>
 
             <Text style={styles.title}>Scan your food</Text>
 
-            <Pressable style={styles.iconButton} onPress={() => {}}>
+            <Pressable
+              style={styles.iconButton}
+              onPress={() => {}}
+              disabled={loading}
+            >
               <Ionicons name="flash-outline" size={22} color={colors.white} />
             </Pressable>
           </View>
@@ -30,7 +90,9 @@ export default function ScanScreen() {
 
           {/* Instruction */}
           <View style={styles.instruction}>
-            <Text style={styles.instructionTitle}>Capture your meal</Text>
+            <Text style={styles.instructionTitle}>
+              {loading ? "Analyzing your meal..." : "Capture your meal"}
+            </Text>
 
             <CameraTip />
           </View>
@@ -38,7 +100,11 @@ export default function ScanScreen() {
           {/* Bottom controls */}
           <View style={styles.bottomControls}>
             {/* Gallery */}
-            <Pressable style={styles.sideButton} onPress={() => {}}>
+            <Pressable
+              style={styles.sideButton}
+              onPress={() => {}}
+              disabled={loading}
+            >
               <Ionicons name="images-outline" size={24} color={colors.white} />
 
               <Text style={styles.sideButtonText}>Gallery</Text>
@@ -48,11 +114,11 @@ export default function ScanScreen() {
             <Pressable
               style={({ pressed }) => [
                 styles.captureButton,
-                pressed && { opacity: 0.8, transform: [{ scale: 0.95 }] },
+                pressed && !loading && styles.capturePressed,
+                loading && styles.captureDisabled,
               ]}
-              onPress={() => {
-                router.push("/main/segmentation-review");
-              }}
+              onPress={handleCapture}
+              disabled={loading}
             >
               <View style={styles.captureInner} pointerEvents="none" />
             </Pressable>
@@ -74,10 +140,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#111111",
   },
 
-  /*
-   * Temporary visual camera preview.
-   * Later this View will be replaced with CameraView.
-   */
   cameraPreview: {
     flex: 1,
     backgroundColor: "#292929",
@@ -174,5 +236,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderWidth: 2,
     borderColor: "#222222",
+  },
+
+  capturePressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.95 }],
+  },
+
+  captureDisabled: {
+    opacity: 0.6,
   },
 });

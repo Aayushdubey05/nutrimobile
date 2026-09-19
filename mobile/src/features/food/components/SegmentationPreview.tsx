@@ -144,7 +144,10 @@ export default function SegmentationPreview({
             <View
               style={[
                 styles.labelBadge,
-                { borderColor: item.color, backgroundColor: "rgba(23, 23, 23, 0.85)" },
+                {
+                  borderColor: item.color,
+                  backgroundColor: "rgba(23, 23, 23, 0.85)",
+                },
               ]}
             >
               <View
@@ -268,4 +271,3 @@ const styles = StyleSheet.create({
     color: colors.white,
   },
 });
-
