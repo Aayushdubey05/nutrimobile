@@ -1,36 +1,155 @@
 import { Ionicons } from "@expo/vector-icons";
 import {
-    Alert,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
+import {
+  nutritionService,
+  type DailyNutritionResponse,
+} from "@/features/nutrition/services/nutritionService";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useCallback, useEffect, useState } from "react";
 
 import BottomNav from "@/components/BottomNav";
 import { colors } from "@/constants/colors";
-import ConsistencyCard from "@/features/recommendations/components/ConsistencyCard";
 import NutritionStatusCard from "@/features/recommendations/components/NutritionStatusCard";
 import RecommendationCard from "@/features/recommendations/components/RecommendationCard";
+import { recommendationService } from "@/features/recommendations/services/recommendationService";
+import type {
+  Recommendation,
+  RecommendationFeedbackType,
+} from "@/features/recommendations/types";
+
+const CATEGORY_CONFIG: Record<
+  Recommendation["category"],
+  { label: string; color: string }
+> = {
+  CALORIES: {
+    label: "Calorie Focus",
+    color: "#C58A00",
+  },
+  PROTEIN: {
+    label: "Protein Focus",
+    color: "#2563EB",
+  },
+  CARBOHYDRATES: {
+    label: "Carbohydrates",
+    color: "#8B5CF6",
+  },
+  FAT: {
+    label: "Healthy Fats",
+    color: "#D97706",
+  },
+  MEAL_TIMING: {
+    label: "Meal Timing",
+    color: "#0891B2",
+  },
+  FOOD_CHOICE: {
+    label: "Food Choice",
+    color: "#2E7D32",
+  },
+  HYDRATION: {
+    label: "Hydration",
+    color: "#0284C7",
+  },
+  GENERAL_HEALTH: {
+    label: "General Health",
+    color: "#2E7D32",
+  },
+  FITNESS: {
+    label: "Fitness",
+    color: "#DC2626",
+  },
+};
 
 export default function RecommendationsScreen() {
-  const handleRefresh = () => {
-    Alert.alert(
-      "Recommendations Updated",
-      "Your latest nutrition insights are ready.",
-    );
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [dailyNutrition, setDailyNutrition] =
+    useState<DailyNutritionResponse | null>(null);
+
+  const loadRecommendations = useCallback(async () => {
+    try {
+      const today = new Date().toISOString().split("T")[0];
+
+      const [recommendationsData, nutritionData] = await Promise.all([
+        recommendationService.getActiveRecommendations(),
+        nutritionService.getDailyNutrition(today),
+      ]);
+
+      setRecommendations(recommendationsData);
+      setDailyNutrition(nutritionData);
+    } catch (error) {
+      Alert.alert(
+        "Unable to load recommendations",
+        error instanceof Error ? error.message : "Something went wrong.",
+      );
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadRecommendations();
+  }, [loadRecommendations]);
+
+  const handleRefresh = async () => {
+    try {
+      setRefreshing(true);
+
+      const today = new Date().toISOString().split("T")[0];
+
+      const [generated, nutritionData] = await Promise.all([
+        recommendationService.generateRecommendations(),
+        nutritionService.getDailyNutrition(today),
+      ]);
+
+      setRecommendations(generated);
+      setDailyNutrition(nutritionData);
+    } catch (error) {
+      Alert.alert(
+        "Unable to update recommendations",
+        error instanceof Error ? error.message : "Something went wrong.",
+      );
+
+      setRefreshing(false);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
-  const handleAddToLog = (food: string) => {
-    Alert.alert("Add to Log", `${food} will be added to your meal log.`);
+  const handleFeedback = async (
+    recommendationId: number,
+    feedback: RecommendationFeedbackType,
+  ) => {
+    try {
+      await recommendationService.addFeedback(recommendationId, feedback);
+
+      setRecommendations((current) =>
+        current.map((recommendation) =>
+          recommendation.id === recommendationId
+            ? { ...recommendation, feedback }
+            : recommendation,
+        ),
+      );
+    } catch (error) {
+      Alert.alert(
+        "Feedback failed",
+        error instanceof Error ? error.message : "Unable to save feedback.",
+      );
+    }
   };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <View style={styles.container}>
-        {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerText}>
             <Text style={styles.title}>Recommendations</Text>
@@ -40,8 +159,16 @@ export default function RecommendationsScreen() {
             </Text>
           </View>
 
-          <Pressable style={styles.refreshButton} onPress={handleRefresh}>
-            <Ionicons name="refresh-outline" size={20} color={colors.text} />
+          <Pressable
+            style={styles.refreshButton}
+            onPress={handleRefresh}
+            disabled={refreshing}
+          >
+            {refreshing ? (
+              <ActivityIndicator size="small" color={colors.text} />
+            ) : (
+              <Ionicons name="refresh-outline" size={20} color={colors.text} />
+            )}
           </Pressable>
         </View>
 
@@ -49,63 +176,69 @@ export default function RecommendationsScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          {/* Nutrition Summary */}
-          <NutritionStatusCard consumed={1240} target={2000} remaining={760} />
+          {/* Temporary until DailyNutritionResponse is wired */}
+          {dailyNutrition && (
+            <NutritionStatusCard
+              consumed={dailyNutrition.consumed.caloriesKcal}
+              target={dailyNutrition.target.caloriesKcal}
+              remaining={dailyNutrition.remaining.caloriesKcal}
+            />
+          )}
 
-          {/* Section Header */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Today's Insights & Advice</Text>
-
-            <Text style={styles.updatedText}>Updated 10m ago</Text>
           </View>
 
-          {/* Recommendation 1 */}
-          <RecommendationCard
-            category="Protein Focus"
-            categoryColor="#2563EB"
-            title="Add more protein"
-            description="You're 38g below your protein goal today. Consider adding high-protein options like Paneer, Dal, or grilled tofu to your dinner."
-            recommendation="Recommended: Paneer Tikka / Dal Tadka"
-            showAddToLog
-            onAddToLog={() => handleAddToLog("Paneer Tikka / Dal Tadka")}
-          />
+          {loading ? (
+            <View style={styles.centerState}>
+              <ActivityIndicator size="small" color={colors.text} />
+              <Text style={styles.stateText}>Loading recommendations...</Text>
+            </View>
+          ) : recommendations.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Ionicons
+                name="sparkles-outline"
+                size={28}
+                color={colors.secondaryText}
+              />
 
-          {/* Recommendation 2 */}
-          <RecommendationCard
-            category="Micronutrients & Fiber"
-            categoryColor="#2E7D32"
-            title="Balance your meal"
-            description="Try adding vegetables to your next meal. You're slightly low on key dietary fiber and micronutrients."
-            recommendation="Mixed Vegetable Sabzi or Fresh Salad"
-            showAddToLog
-            onAddToLog={() =>
-              handleAddToLog("Mixed Vegetable Sabzi or Fresh Salad")
-            }
-          />
+              <Text style={styles.emptyTitle}>No recommendations yet</Text>
 
-          {/* Recommendation 3 */}
-          <RecommendationCard
-            category="Calorie Budget"
-            categoryColor="#C58A00"
-            title="Watch your calories"
-            description="You have 760 kcal remaining. Opt for lighter cooking methods or smaller portions for your evening snack."
-          />
+              <Text style={styles.emptyText}>
+                Log some meals and refresh to generate today's nutrition
+                recommendations.
+              </Text>
+            </View>
+          ) : (
+            recommendations.map((recommendation) => {
+              const config = CATEGORY_CONFIG[recommendation.category];
 
-          {/* Consistency */}
-          <ConsistencyCard />
+              return (
+                <RecommendationCard
+                  key={recommendation.id}
+                  category={config.label}
+                  categoryColor={config.color}
+                  title={recommendation.title}
+                  description={recommendation.description}
+                  reason={recommendation.reason}
+                  feedback={recommendation.feedback}
+                  onFeedback={(feedback) =>
+                    handleFeedback(recommendation.id, feedback)
+                  }
+                />
+              );
+            })
+          )}
 
-          {/* Footer message */}
           <View style={styles.footerMessage}>
             <Text style={styles.footerTitle}>All caught up?</Text>
 
             <Text style={styles.footerText}>
-              Your recommendations refresh automatically as you log new meals
-              throughout the day.
+              Recommendations update as your nutrition and meals change.
             </Text>
           </View>
         </ScrollView>
 
-        {/* Bottom Navigation */}
         <BottomNav active={null} />
       </View>
     </SafeAreaView>
@@ -178,10 +311,39 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
 
-  updatedText: {
-    fontSize: 11,
+  centerState: {
+    alignItems: "center",
+    paddingVertical: 40,
+    gap: 10,
+  },
+
+  stateText: {
+    fontSize: 13,
     color: colors.secondaryText,
-    marginTop: 4,
+  },
+
+  emptyState: {
+    alignItems: "center",
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 18,
+    padding: 28,
+  },
+
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.text,
+    marginTop: 10,
+  },
+
+  emptyText: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.secondaryText,
+    textAlign: "center",
+    marginTop: 6,
   },
 
   footerMessage: {

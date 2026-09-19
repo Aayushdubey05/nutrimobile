@@ -2,14 +2,16 @@ import { colors } from "@/constants/colors";
 import { Ionicons } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import type { RecommendationFeedbackType } from "../types";
+
 interface RecommendationCardProps {
   category: string;
   categoryColor: string;
   title: string;
   description: string;
-  recommendation?: string;
-  showAddToLog?: boolean;
-  onAddToLog?: () => void;
+  reason?: string;
+  feedback: RecommendationFeedbackType | null;
+  onFeedback: (feedback: RecommendationFeedbackType) => void;
 }
 
 export default function RecommendationCard({
@@ -17,13 +19,12 @@ export default function RecommendationCard({
   categoryColor,
   title,
   description,
-  recommendation,
-  showAddToLog = false,
-  onAddToLog,
+  reason,
+  feedback,
+  onFeedback,
 }: RecommendationCardProps) {
   return (
     <View style={styles.card}>
-      {/* Category */}
       <View
         style={[styles.categoryPill, { backgroundColor: `${categoryColor}18` }]}
       >
@@ -36,14 +37,11 @@ export default function RecommendationCard({
         </Text>
       </View>
 
-      {/* Title */}
       <Text style={styles.title}>{title}</Text>
 
-      {/* Description */}
       <Text style={styles.description}>{description}</Text>
 
-      {/* Recommendation */}
-      {recommendation && (
+      {reason && (
         <View style={styles.recommendationBox}>
           <Ionicons
             name="bulb-outline"
@@ -51,33 +49,36 @@ export default function RecommendationCard({
             color={colors.secondaryText}
           />
 
-          <Text style={styles.recommendationText}>{recommendation}</Text>
+          <Text style={styles.recommendationText}>{reason}</Text>
         </View>
       )}
 
-      {/* Bottom actions */}
       <View style={styles.bottomRow}>
         <View style={styles.feedbackContainer}>
           <Text style={styles.helpfulText}>Helpful?</Text>
 
-          <Pressable style={styles.feedbackButton}>
+          <Pressable
+            style={[
+              styles.feedbackButton,
+              feedback === "LIKE" && styles.feedbackButtonActive,
+            ]}
+            onPress={() => onFeedback("LIKE")}
+          >
             <Text style={styles.feedbackEmoji}>👍</Text>
             <Text style={styles.feedbackText}>Yes</Text>
           </Pressable>
 
-          <Pressable style={styles.feedbackButton}>
+          <Pressable
+            style={[
+              styles.feedbackButton,
+              feedback === "DISLIKE" && styles.feedbackButtonActive,
+            ]}
+            onPress={() => onFeedback("DISLIKE")}
+          >
             <Text style={styles.feedbackEmoji}>👎</Text>
             <Text style={styles.feedbackText}>No</Text>
           </Pressable>
         </View>
-
-        {showAddToLog && (
-          <Pressable style={styles.addButton} onPress={onAddToLog}>
-            <Text style={styles.addButtonText}>Add to Log</Text>
-
-            <Ionicons name="arrow-forward" size={15} color={colors.text} />
-          </Pressable>
-        )}
       </View>
     </View>
   );
@@ -90,6 +91,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: 18,
     padding: 18,
+    marginBottom: 12,
   },
 
   categoryPill: {
@@ -145,14 +147,10 @@ const styles = StyleSheet.create({
   },
 
   bottomRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     marginTop: 17,
     paddingTop: 14,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    gap: 10,
   },
 
   feedbackContainer: {
@@ -172,6 +170,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 3,
     paddingVertical: 5,
+    paddingHorizontal: 6,
+    borderRadius: 8,
+  },
+
+  feedbackButtonActive: {
+    backgroundColor: "#F0F0F0",
   },
 
   feedbackEmoji: {
@@ -182,17 +186,5 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "600",
     color: colors.secondaryText,
-  },
-
-  addButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-
-  addButtonText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: colors.text,
   },
 });

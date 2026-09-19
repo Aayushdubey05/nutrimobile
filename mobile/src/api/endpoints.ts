@@ -42,4 +42,12 @@ export const ENDPOINTS = {
     UPDATE_ITEM: (analysisId: number, itemId: number) =>
       `/analysis/${analysisId}/items/${itemId}`,
   },
+
+  RECOMMENDATIONS: {
+    GENERATE: "/recommendations/generate",
+    LIST: "/recommendations",
+    ACTIVE: "/recommendations/active",
+    FEEDBACK: (recommendationId: number) =>
+      `/recommendations/${recommendationId}/feedback`,
+  },
 } as const;

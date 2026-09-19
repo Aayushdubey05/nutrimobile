@@ -13,6 +13,25 @@ export interface NutritionTargetResponse {
   effectiveFrom: string;
 }
 
+export interface DailyNutritionValues {
+  caloriesKcal: number;
+  proteinG: number;
+  carbohydratesG: number;
+  fatG: number;
+  fiberG: number;
+  sugarG: number;
+  saturatedFatG: number;
+  sodiumMg: number;
+  cholesterolMg: number;
+}
+
+export interface DailyNutritionResponse {
+  date: string;
+  target: DailyNutritionValues;
+  consumed: DailyNutritionValues;
+  remaining: DailyNutritionValues;
+}
+
 export const nutritionService = {
   async calculateTarget(): Promise<NutritionTargetResponse> {
     const response = await apiClient.post<ApiResponse<NutritionTargetResponse>>(
@@ -37,6 +56,18 @@ export const nutritionService = {
       throw new Error(
         response.data.message || "Failed to get nutrition target",
       );
+    }
+
+    return response.data.data;
+  },
+
+  async getDailyNutrition(date: string): Promise<DailyNutritionResponse> {
+    const response = await apiClient.get<ApiResponse<DailyNutritionResponse>>(
+      ENDPOINTS.NUTRITION.DAILY(date),
+    );
+
+    if (!response.data.data) {
+      throw new Error(response.data.message || "Failed to get daily nutrition");
     }
 
     return response.data.data;
