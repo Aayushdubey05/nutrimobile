@@ -9,14 +9,16 @@ interface MacroSummaryProps {
 }
 
 function MacroSummary({ label, consumed, target }: MacroSummaryProps) {
-  const progress = Math.min(consumed / target, 1);
+  const safeTarget = target > 0 ? target : 1;
+  const progress = Math.min(consumed / safeTarget, 1);
 
   return (
     <View style={styles.container}>
       <Text style={styles.label}>{label}</Text>
 
       <Text style={styles.value}>
-        {consumed}g<Text style={styles.target}> / {target}g</Text>
+        {Math.round(consumed)}g
+        <Text style={styles.target}> / {Math.round(target)}g</Text>
       </Text>
 
       <View style={styles.track}>
@@ -33,14 +35,30 @@ function MacroSummary({ label, consumed, target }: MacroSummaryProps) {
   );
 }
 
-export default function MacroSummaryRow() {
+interface MacroSummaryRowProps {
+  protein: number;
+  proteinTarget: number;
+  carbs: number;
+  carbsTarget: number;
+  fat: number;
+  fatTarget: number;
+}
+
+export default function MacroSummaryRow({
+  protein,
+  proteinTarget,
+  carbs,
+  carbsTarget,
+  fat,
+  fatTarget,
+}: MacroSummaryRowProps) {
   return (
     <View style={styles.row}>
-      <MacroSummary label="Protein" consumed={58} target={100} />
+      <MacroSummary label="Protein" consumed={protein} target={proteinTarget} />
 
-      <MacroSummary label="Carbs" consumed={142} target={220} />
+      <MacroSummary label="Carbs" consumed={carbs} target={carbsTarget} />
 
-      <MacroSummary label="Fat" consumed={44} target={65} />
+      <MacroSummary label="Fat" consumed={fat} target={fatTarget} />
     </View>
   );
 }
@@ -48,8 +66,8 @@ export default function MacroSummaryRow() {
 const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
+    justifyContent: "space-between",
     gap: 12,
-    marginTop: 20,
   },
 
   container: {
@@ -57,26 +75,26 @@ const styles = StyleSheet.create({
   },
 
   label: {
-    fontSize: 11,
+    fontSize: 12,
     color: colors.secondaryText,
-    marginBottom: 5,
+    marginBottom: 4,
   },
 
   value: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "600",
     color: colors.text,
   },
 
   target: {
-    fontWeight: "400",
     color: colors.secondaryText,
+    fontWeight: "400",
   },
 
   track: {
-    height: 4,
-    backgroundColor: "#ECECEC",
-    borderRadius: 2,
+    height: 5,
+    backgroundColor: colors.border,
+    borderRadius: 999,
     overflow: "hidden",
     marginTop: 8,
   },
@@ -84,6 +102,6 @@ const styles = StyleSheet.create({
   progress: {
     height: "100%",
     backgroundColor: colors.text,
-    borderRadius: 2,
+    borderRadius: 999,
   },
 });

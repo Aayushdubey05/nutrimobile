@@ -1,74 +1,116 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 
 import BottomNav from "../../src/components/BottomNav";
 import { colors } from "../../src/constants/colors";
 import DateSelector from "../../src/features/history/components/DateSelector";
 import MealCard from "../../src/features/history/components/MealCard";
+import { mealService } from "../../src/features/meal/services/mealService";
+import type { MealResponse } from "../../src/features/meal/types";
 import MacroSummaryRow from "../../src/features/nutrition/components/MacroSummary";
+import { nutritionService } from "../../src/features/nutrition/services/nutritionService";
 
 const MEAL_IMAGE =
   "https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=600&q=85";
 
-const MEALS = [
-  {
-    id: "1",
-    mealType: "Breakfast",
-    time: "8:30 AM",
-    name: "Paneer Tikka",
-    calories: 280,
-  },
-  {
-    id: "2",
-    mealType: "Lunch",
-    time: "1:15 PM",
-    name: "Dal Tadka & Roti",
-    calories: 420,
-  },
-  {
-    id: "3",
-    mealType: "Dinner",
-    time: "7:30 PM",
-    name: "Paneer Tikka",
-    calories: 360,
-  },
-];
-
 export default function DiaryScreen() {
-  const [meals, setMeals] = useState(MEALS);
+  const [meals, setMeals] = useState<MealResponse[]>([]);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [loading, setLoading] = useState(true);
 
-  const [selectedDate, setSelectedDate] = useState("Today, 7 Sep");
+  const [calorieTarget, setCalorieTarget] = useState(0);
+  const [proteinTarget, setProteinTarget] = useState(0);
+  const [carbsTarget, setCarbsTarget] = useState(0);
+  const [fatTarget, setFatTarget] = useState(0);
+
+  useEffect(() => {
+    loadDiary();
+  }, [selectedDate]);
+
+  const loadDiary = async () => {
+    try {
+      setLoading(true);
+
+      const date = formatDateForApi(selectedDate);
+
+      const [mealData, targetData] = await Promise.all([
+        mealService.getMealsByDate(date),
+        nutritionService.getCurrentTarget(),
+      ]);
+
+      setMeals(mealData);
+
+      setCalorieTarget(Number(targetData.calorieTargetKcal));
+      setProteinTarget(Number(targetData.proteinTargetG));
+      setCarbsTarget(Number(targetData.carbohydrateTargetG));
+      setFatTarget(Number(targetData.fatTargetG));
+    } catch (error) {
+      console.error("Failed to load diary:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteMeal = async (mealId: number) => {
+    try {
+      await mealService.deleteMeal(mealId);
+
+      setMeals((currentMeals) =>
+        currentMeals.filter((meal) => meal.id !== mealId),
+      );
+    } catch (error) {
+      console.error("Failed to delete meal:", error);
+    }
+  };
 
   const caloriesConsumed = meals.reduce(
-    (total, meal) => total + meal.calories,
+    (total, meal) => total + Number(meal.nutrition.caloriesKcal),
     0,
   );
 
-  const calorieTarget = 2000;
+  const proteinConsumed = meals.reduce(
+    (total, meal) => total + Number(meal.nutrition.proteinG),
+    0,
+  );
+
+  const carbsConsumed = meals.reduce(
+    (total, meal) => total + Number(meal.nutrition.carbohydratesG),
+    0,
+  );
+
+  const fatConsumed = meals.reduce(
+    (total, meal) => total + Number(meal.nutrition.fatG),
+    0,
+  );
 
   const caloriesLeft = Math.max(calorieTarget - caloriesConsumed, 0);
 
-  const calorieProgress = Math.min(caloriesConsumed / calorieTarget, 1);
-
-  const handleDeleteMeal = (id: string) => {
-    setMeals((currentMeals) => currentMeals.filter((meal) => meal.id !== id));
-  };
+  const calorieProgress =
+    calorieTarget > 0 ? Math.min(caloriesConsumed / calorieTarget, 1) : 0;
 
   const handlePreviousDay = () => {
-    // UI-only for now.
+    setSelectedDate((current) => {
+      const previous = new Date(current);
+      previous.setDate(previous.getDate() - 1);
+      return previous;
+    });
   };
 
   const handleNextDay = () => {
-    // UI-only for now.
+    setSelectedDate((current) => {
+      const next = new Date(current);
+      next.setDate(next.getDate() + 1);
+      return next;
+    });
   };
 
   const handleAddMeal = () => {
@@ -82,7 +124,6 @@ export default function DiaryScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.content}
         >
-          {/* Header */}
           <View style={styles.header}>
             <View>
               <Text style={styles.title}>Meal Diary</Text>
@@ -99,14 +140,12 @@ export default function DiaryScreen() {
             </Pressable>
           </View>
 
-          {/* Date Selector */}
           <DateSelector
-            dateLabel={selectedDate}
+            dateLabel={formatDateLabel(selectedDate)}
             onPrevious={handlePreviousDay}
             onNext={handleNextDay}
           />
 
-          {/* Nutrition Summary */}
           <View style={styles.summaryCard}>
             <View style={styles.summaryTopRow}>
               <View>
@@ -114,23 +153,22 @@ export default function DiaryScreen() {
 
                 <View style={styles.calorieRow}>
                   <Text style={styles.calorieValue}>
-                    {caloriesConsumed.toLocaleString()}
+                    {Math.round(caloriesConsumed).toLocaleString()}
                   </Text>
 
                   <Text style={styles.calorieTarget}>
-                    / {calorieTarget.toLocaleString()} kcal
+                    / {Math.round(calorieTarget).toLocaleString()} kcal
                   </Text>
                 </View>
               </View>
 
               <View style={styles.leftPill}>
                 <Text style={styles.leftPillText}>
-                  {caloriesLeft} kcal left
+                  {Math.round(caloriesLeft)} kcal left
                 </Text>
               </View>
             </View>
 
-            {/* Calorie Progress */}
             <View style={styles.calorieTrack}>
               <View
                 style={[
@@ -142,30 +180,40 @@ export default function DiaryScreen() {
               />
             </View>
 
-            {/* Macro Summary */}
-            <MacroSummaryRow />
+            <MacroSummaryRow
+              protein={proteinConsumed}
+              proteinTarget={proteinTarget}
+              carbs={carbsConsumed}
+              carbsTarget={carbsTarget}
+              fat={fatConsumed}
+              fatTarget={fatTarget}
+            />
           </View>
 
-          {/* Meals Header */}
           <View style={styles.mealsHeader}>
-            <Text style={styles.mealsTitle}>Today's Meals</Text>
+            <Text style={styles.mealsTitle}>
+              {isToday(selectedDate) ? "Today's Meals" : "Meals"}
+            </Text>
 
             <Text style={styles.mealsCount}>{meals.length} logged</Text>
           </View>
 
-          {/* Meals */}
-          {meals.length > 0 ? (
+          {loading ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>Loading meals...</Text>
+            </View>
+          ) : meals.length > 0 ? (
             <View>
               {meals.map((meal) => (
                 <MealCard
                   key={meal.id}
-                  mealType={meal.mealType}
-                  time={meal.time}
-                  name={meal.name}
-                  calories={meal.calories}
-                  imageUrl={MEAL_IMAGE}
+                  mealType={formatMealType(meal.mealType)}
+                  time={formatMealTime(meal.mealTime)}
+                  name={getMealName(meal)}
+                  calories={Math.round(Number(meal.nutrition.caloriesKcal))}
+                  imageUrl={getMealImage(meal)}
                   onEdit={() => {
-                    // UI-only for now.
+                    // Edit flow can be connected later.
                   }}
                   onDelete={() => handleDeleteMeal(meal.id)}
                 />
@@ -181,7 +229,7 @@ export default function DiaryScreen() {
                 />
               </View>
 
-              <Text style={styles.emptyTitle}>No meals logged today</Text>
+              <Text style={styles.emptyTitle}>No meals logged</Text>
 
               <Text style={styles.emptyText}>
                 Scan or search for food to start your diary.
@@ -189,7 +237,6 @@ export default function DiaryScreen() {
             </View>
           )}
 
-          {/* Add Meal */}
           <Pressable style={styles.logAnotherButton} onPress={handleAddMeal}>
             <Ionicons name="add" size={19} color={colors.text} />
 
@@ -197,11 +244,74 @@ export default function DiaryScreen() {
           </Pressable>
         </ScrollView>
 
-        {/* Bottom Navigation */}
         <BottomNav active="diary" />
       </SafeAreaView>
     </View>
   );
+}
+
+function formatDateForApi(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function formatDateLabel(date: Date): string {
+  const today = new Date();
+
+  const isCurrentDay =
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth() &&
+    date.getDate() === today.getDate();
+
+  if (isCurrentDay) {
+    return `Today, ${date.getDate()} ${date.toLocaleString("en-US", {
+      month: "short",
+    })}`;
+  }
+
+  return date.toLocaleDateString("en-US", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function isToday(date: Date): boolean {
+  const today = new Date();
+
+  return (
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth() &&
+    date.getDate() === today.getDate()
+  );
+}
+
+function formatMealType(type: string): string {
+  return type.charAt(0) + type.slice(1).toLowerCase();
+}
+
+function formatMealTime(time: string): string {
+  const [hours, minutes] = time.split(":").map(Number);
+
+  const period = hours >= 12 ? "PM" : "AM";
+  const hour12 = hours % 12 || 12;
+
+  return `${hour12}:${String(minutes).padStart(2, "0")} ${period}`;
+}
+
+function getMealName(meal: MealResponse): string {
+  if (meal.items.length === 0) {
+    return "Meal";
+  }
+
+  return meal.items.map((item) => item.foodName).join(" + ");
+}
+
+function getMealImage(meal: MealResponse): string {
+  return meal.items.find((item) => item.imageUrl)?.imageUrl ?? MEAL_IMAGE;
 }
 
 const styles = StyleSheet.create({

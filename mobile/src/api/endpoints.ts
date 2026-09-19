@@ -25,6 +25,7 @@ export const ENDPOINTS = {
   MEALS: {
     LIST: "/meals",
     CREATE: "/meals",
+    BY_ID: (mealId: number) => `/meals/${mealId}`,
     BY_DATE: (date: string) => `/meals/date/${date}`,
   },
 
