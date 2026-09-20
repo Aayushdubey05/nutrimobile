@@ -50,4 +50,8 @@ export const ENDPOINTS = {
     FEEDBACK: (recommendationId: number) =>
       `/recommendations/${recommendationId}/feedback`,
   },
+
+  PROGRESS: {
+    SUMMARY: (period: "WEEK" | "MONTH") => `/progress?period=${period}`,
+  },
 } as const;

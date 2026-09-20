@@ -1,132 +1,190 @@
+import { ScrollView, StyleSheet, Text, View } from "react-native";
+
 import { colors } from "@/constants/colors";
-import { StyleSheet, Text, View } from "react-native";
+import type { ProgressDailyData } from "../types";
 
-const DATA = [
-  { day: "Mon", calories: 1780 },
-  { day: "Tue", calories: 1920 },
-  { day: "Wed", calories: 2100 },
-  { day: "Thu", calories: 1840 },
-  { day: "Fri", calories: 1980 },
-  { day: "Sat", calories: 1820 },
-  { day: "Sun", calories: 1860 },
-];
+interface CalorieTrendChartProps {
+  data: ProgressDailyData[];
+}
 
-const GOAL = 2000;
-const MAX_CALORIES = 2200;
-
-export default function CalorieTrendChart() {
+export default function CalorieTrendChart({ data }: CalorieTrendChartProps) {
   const chartHeight = 190;
-  const goalPosition = chartHeight - (GOAL / MAX_CALORIES) * chartHeight;
+
+  const maxCalories = Math.max(
+    ...data.map((item) => item.calories),
+    ...data.map((item) => item.targetCalories),
+    1,
+  );
+
+  const chartMax = maxCalories * 1.1;
+
+  const firstTarget = data.length > 0 ? data[0].targetCalories : 0;
+
+  const goalPosition = chartHeight - (firstTarget / chartMax) * chartHeight;
+
+  const highest =
+    data.length > 0
+      ? data.reduce((highest, current) =>
+          current.calories > highest.calories ? current : highest,
+        )
+      : null;
+
+  const today = data.length > 0 ? data[data.length - 1] : null;
+
+  const formatDay = (dateString: string) => {
+    const [year, month, day] = dateString.split("-").map(Number);
+
+    const date = new Date(year, month - 1, day);
+
+    if (data.length <= 7) {
+      return date.toLocaleDateString("en-IN", {
+        weekday: "short",
+      });
+    }
+
+    return String(day);
+  };
+
+  const formatNumber = (value: number) =>
+    Math.round(value).toLocaleString("en-IN");
+
+  const todayDifference = today ? today.targetCalories - today.calories : 0;
 
   return (
     <View style={styles.container}>
-      {/* Legend */}
       <View style={styles.legendRow}>
         <View style={styles.legendItem}>
           <View style={styles.legendDot} />
+
           <Text style={styles.legendText}>Daily Intake</Text>
         </View>
 
         <View style={styles.legendItem}>
           <View style={styles.goalLegendLine} />
-          <Text style={styles.legendText}>Goal (2,000)</Text>
+
+          <Text style={styles.legendText}>Goal</Text>
         </View>
       </View>
 
-      {/* Chart */}
-      <View style={styles.chart}>
-        {/* Goal line */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.chartScroll}
+      >
         <View
           style={[
-            styles.goalLine,
+            styles.chart,
             {
-              top: goalPosition,
+              width: Math.max(data.length * 52, 320),
             },
           ]}
-        />
+        >
+          <View
+            style={[
+              styles.goalLine,
+              {
+                top: goalPosition,
+              },
+            ]}
+          />
 
-        <View style={styles.barsContainer}>
-          {DATA.map((item) => {
-            const barHeight = (item.calories / MAX_CALORIES) * chartHeight;
+          <View style={styles.barsContainer}>
+            {data.map((item) => {
+              const barHeight =
+                item.calories > 0
+                  ? (item.calories / chartMax) * chartHeight
+                  : 2;
 
-            return (
-              <View key={item.day} style={styles.barColumn}>
-                <View style={styles.barArea}>
-                  <View
-                    style={[
-                      styles.bar,
-                      {
-                        height: barHeight,
-                      },
-                    ]}
-                  />
+              const overGoal = item.calories > item.targetCalories;
 
-                  {item.calories > GOAL && <View style={styles.overGoalDot} />}
+              return (
+                <View key={item.date} style={styles.barColumn}>
+                  <View style={styles.barArea}>
+                    <View
+                      style={[
+                        styles.bar,
+                        {
+                          height: barHeight,
+                        },
+                      ]}
+                    />
+
+                    {overGoal && <View style={styles.overGoalDot} />}
+                  </View>
+
+                  <Text style={styles.day}>{formatDay(item.date)}</Text>
                 </View>
-
-                <Text style={styles.day}>{item.day}</Text>
-              </View>
-            );
-          })}
+              );
+            })}
+          </View>
         </View>
-      </View>
+      </ScrollView>
 
-      {/* Chart summary */}
-      <View style={styles.summary}>
+      {highest && (
         <Text style={styles.summaryText}>
-          Highest: <Text style={styles.bold}>2,100 kcal</Text> (Wed)
+          Highest:{" "}
+          <Text style={styles.bold}>{formatNumber(highest.calories)} kcal</Text>{" "}
+          ({formatDay(highest.date)})
         </Text>
+      )}
 
+      {today && (
         <Text style={styles.summaryText}>
-          Remaining Today: <Text style={styles.bold}>760 kcal</Text>
+          {todayDifference >= 0 ? "Remaining Today: " : "Over Target Today: "}
+
+          <Text style={styles.bold}>
+            {formatNumber(Math.abs(todayDifference))} kcal
+          </Text>
         </Text>
-      </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 16,
+    marginTop: 12,
   },
 
   legendRow: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    gap: 14,
-    marginBottom: 14,
+    justifyContent: "space-between",
+    marginBottom: 12,
   },
 
   legendItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
   },
 
   legendDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 7,
-    backgroundColor: colors.primary,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.text,
+    marginRight: 6,
   },
 
   goalLegendLine: {
-    width: 15,
-    height: 1,
-    backgroundColor: colors.secondaryText,
+    width: 14,
+    borderTopWidth: 1,
+    borderStyle: "dashed",
+    borderTopColor: colors.secondaryText,
+    marginRight: 6,
   },
 
   legendText: {
-    fontSize: 10,
+    fontSize: 11,
     color: colors.secondaryText,
+  },
+
+  chartScroll: {
+    paddingBottom: 4,
   },
 
   chart: {
     height: 220,
     position: "relative",
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
   },
 
   goalLine: {
@@ -135,22 +193,20 @@ const styles = StyleSheet.create({
     right: 0,
     borderTopWidth: 1,
     borderStyle: "dashed",
-    borderTopColor: "#999999",
-    zIndex: 1,
+    borderTopColor: colors.secondaryText,
   },
 
   barsContainer: {
-    height: "100%",
+    height: 210,
     flexDirection: "row",
     alignItems: "flex-end",
-    justifyContent: "space-between",
-    paddingHorizontal: 8,
+    justifyContent: "space-around",
   },
 
   barColumn: {
-    flex: 1,
+    width: 40,
+    height: 210,
     alignItems: "center",
-    height: "100%",
     justifyContent: "flex-end",
   },
 
@@ -162,10 +218,9 @@ const styles = StyleSheet.create({
   },
 
   bar: {
-    width: 20,
-    backgroundColor: colors.primary,
-    borderTopLeftRadius: 5,
-    borderTopRightRadius: 5,
+    width: 18,
+    borderRadius: 5,
+    backgroundColor: colors.text,
   },
 
   overGoalDot: {
@@ -173,24 +228,19 @@ const styles = StyleSheet.create({
     top: 0,
     width: 6,
     height: 6,
-    borderRadius: 6,
-    backgroundColor: "#C58A00",
+    borderRadius: 3,
+    backgroundColor: colors.secondaryText,
   },
 
   day: {
+    marginTop: 7,
     fontSize: 10,
     color: colors.secondaryText,
-    marginTop: 9,
-    marginBottom: 7,
-  },
-
-  summary: {
-    marginTop: 14,
-    gap: 5,
   },
 
   summaryText: {
-    fontSize: 11,
+    marginTop: 8,
+    fontSize: 12,
     color: colors.secondaryText,
   },
 
