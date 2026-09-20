@@ -9,14 +9,13 @@ import com.nutrivision.backend.user.entity.DietaryRestriction;
 import com.nutrivision.backend.user.entity.HealthCondition;
 import com.nutrivision.backend.user.entity.User;
 import com.nutrivision.backend.user.entity.UserProfile;
-import com.nutrivision.backend.user.repository.DietaryRestrictionRepository;
-import com.nutrivision.backend.user.repository.HealthConditionRepository;
-import com.nutrivision.backend.user.repository.UserProfileRepository;
-import com.nutrivision.backend.user.repository.UserRepository;
+import com.nutrivision.backend.user.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.nutrivision.backend.user.entity.WeightHistory;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.Set;
@@ -31,6 +30,7 @@ public class UserProfileService {
     private final UserProfileRepository userProfileRepository;
     private final DietaryRestrictionRepository dietaryRestrictionRepository;
     private final HealthConditionRepository healthConditionRepository;
+    private final WeightHistoryRepository weightHistoryRepository;
 
     public UserProfileResponse getProfile(Long userId) {
 
@@ -54,13 +54,24 @@ public class UserProfileService {
 
         OffsetDateTime now = OffsetDateTime.now();
 
-        UserProfile profile = userProfileRepository.findByUserId(userId)
-                .orElseGet(() -> {
-                    UserProfile newProfile = new UserProfile();
-                    newProfile.setUser(user);
-                    newProfile.setCreatedAt(now);
-                    return newProfile;
-                });
+        UserProfile profile =
+                userProfileRepository.findByUserId(userId)
+                        .orElseGet(() -> {
+
+                            UserProfile newProfile =
+                                    new UserProfile();
+
+                            newProfile.setUser(user);
+                            newProfile.setCreatedAt(now);
+
+                            return newProfile;
+                        });
+
+        BigDecimal previousWeight =
+                profile.getCurrentWeightKg();
+
+        boolean isNewProfile =
+                profile.getId() == null;
 
         profile.setAge(request.age());
         profile.setGender(request.gender());
@@ -71,20 +82,51 @@ public class UserProfileService {
         profile.setActivityLevel(request.activityLevel());
         profile.setUpdatedAt(now);
 
-        // Clear-and-add to keep Hibernate in sync with the join table
         user.getDietaryRestrictions().clear();
+
         user.getDietaryRestrictions().addAll(
-                findDietaryRestrictions(request.dietaryRestrictionIds())
+                findDietaryRestrictions(
+                        request.dietaryRestrictionIds()
+                )
         );
 
         user.getHealthConditions().clear();
+
         user.getHealthConditions().addAll(
-                findHealthConditions(request.healthConditionIds())
+                findHealthConditions(
+                        request.healthConditionIds()
+                )
         );
 
-        UserProfile savedProfile = userProfileRepository.save(profile);
+        UserProfile savedProfile =
+                userProfileRepository.save(profile);
 
-        return toResponse(user, savedProfile);
+        boolean weightChanged =
+                previousWeight == null
+                        || previousWeight.compareTo(
+                        request.currentWeightKg()
+                ) != 0;
+
+        if (isNewProfile || weightChanged) {
+
+            WeightHistory weightHistory =
+                    new WeightHistory();
+
+            weightHistory.setUser(user);
+            weightHistory.setWeightKg(
+                    request.currentWeightKg()
+            );
+            weightHistory.setRecordedAt(now);
+
+            weightHistoryRepository.save(
+                    weightHistory
+            );
+        }
+
+        return toResponse(
+                user,
+                savedProfile
+        );
     }
 
     private User findUser(Long userId) {
