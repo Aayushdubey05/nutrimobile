@@ -1,51 +1,227 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-    Alert,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { router } from "expo-router";
 
 import BottomNav from "@/components/BottomNav";
 import { colors } from "@/constants/colors";
+import { useAuth } from "@/features/auth/hooks/useAuth";
 
+import CalorieTargetModal from "@/features/profile/components/CalorieTargetModal";
+import EditProfileModal from "@/features/profile/components/EditProfileModal";
 import ProfileCard from "@/features/profile/components/ProfileCard";
 import ProfileSettingRow from "@/features/profile/components/ProfileSettingRow";
 import SettingsRow from "@/features/profile/components/SettingsRow";
+import { profileService } from "@/features/profile/services/profileService";
+
+import type {
+  DietaryRestriction,
+  HealthCondition,
+  NutritionTargetResponse,
+  UserProfileResponse,
+} from "@/features/profile/types";
 
 export default function ProfileScreen() {
+  const { user, refreshUser, logout } = useAuth();
+
+  const [profile, setProfile] = useState<UserProfileResponse | null>(null);
+  const [nutritionTarget, setNutritionTarget] =
+    useState<NutritionTargetResponse | null>(null);
+
+  const [restrictions, setRestrictions] = useState<DietaryRestriction[]>([]);
+  const [healthConditions, setHealthConditions] = useState<HealthCondition[]>(
+    [],
+  );
+
   const [mealReminders, setMealReminders] = useState(true);
 
-  const handleEditProfile = () => {
-    Alert.alert("Edit Profile", "Profile editing will be connected later.");
+  const [loading, setLoading] = useState(true);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [savingTarget, setSavingTarget] = useState(false);
+
+  const [editProfileVisible, setEditProfileVisible] = useState(false);
+  const [calorieModalVisible, setCalorieModalVisible] = useState(false);
+
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
+    try {
+      setLoading(true);
+
+      const profileData = await profileService.getProfile().catch((err) => {
+        if (err.response?.status === 404) return null; // Profile not initialized yet
+        throw err;
+      });
+
+      const settingsData = await profileService.getSettings().catch(() => ({
+        notificationsEnabled: true,
+      }));
+
+      const [restrictionsData, conditionsData] = await Promise.all([
+        profileService.getDietaryRestrictions(),
+        profileService.getHealthConditions(),
+      ]);
+
+      if (!profileData) {
+        // Prompt user to edit/complete profile setup
+        setEditProfileVisible(true);
+      } else {
+        setProfile(profileData);
+      }
+
+      setMealReminders(settingsData.notificationsEnabled);
+      setRestrictions(restrictionsData);
+      setHealthConditions(conditionsData);
+
+      try {
+        let target = await profileService.getNutritionTarget().catch(() => null);
+        if (!target && profileData) {
+          target = await profileService.calculateNutritionTarget().catch(() => null);
+        }
+        setNutritionTarget(target);
+      } catch {
+        setNutritionTarget(null);
+      }
+    } catch (error) {
+      console.error("Failed to load profile:", error);
+      Alert.alert("Unable to Load Profile", "Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleAdjustCalories = () => {
-    Alert.alert(
-      "Daily Calorie Target",
-      "Calorie target adjustment will be connected later.",
-    );
+  const handleSaveProfile = async (data: {
+    name: string;
+    age: number;
+    gender: any;
+    heightCm: number;
+    currentWeightKg: number;
+    targetWeightKg: number | null;
+    fitnessGoal: any;
+    activityLevel: any;
+    dietaryRestrictionIds: number[];
+    healthConditionIds: number[];
+  }) => {
+    try {
+      setSavingProfile(true);
+
+      const updatedProfile = await profileService.updateProfile({
+        age: data.age,
+        gender: data.gender,
+        heightCm: data.heightCm,
+        currentWeightKg: data.currentWeightKg,
+        targetWeightKg: data.targetWeightKg,
+        fitnessGoal: data.fitnessGoal,
+        activityLevel: data.activityLevel,
+        dietaryRestrictionIds: data.dietaryRestrictionIds,
+        healthConditionIds: data.healthConditionIds,
+      });
+
+      if (data.name.trim() !== user?.name) {
+        await profileService.updateUser({
+          name: data.name.trim(),
+        });
+
+        await refreshUser();
+      }
+
+      setProfile(updatedProfile);
+      setEditProfileVisible(false);
+
+      Alert.alert(
+        "Profile Updated",
+        "Your profile has been updated successfully.",
+      );
+    } catch (error) {
+      console.error("Failed to update profile:", error);
+
+      Alert.alert(
+        "Update Failed",
+        "Could not update your profile. Please try again.",
+      );
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
-  const handleDietaryPreference = () => {
-    Alert.alert(
-      "Dietary Preference",
-      "Preference selection will be connected later.",
-    );
+  const handleReminderToggle = async (value: boolean) => {
+    const previousValue = mealReminders;
+
+    setMealReminders(value);
+
+    try {
+      await profileService.updateSettings({
+        notificationsEnabled: value,
+      });
+    } catch (error) {
+      console.error("Failed to update notification setting:", error);
+
+      setMealReminders(previousValue);
+
+      Alert.alert("Update Failed", "Could not update notification settings.");
+    }
   };
 
-  const handleHealthConditions = () => {
-    Alert.alert(
-      "Health Conditions",
-      "Health condition editing will be connected later.",
-    );
+  const handleSaveTarget = async (data: {
+    calorieTargetKcal: number;
+    proteinTargetG: number;
+    carbohydrateTargetG: number;
+    fatTargetG: number;
+  }) => {
+    try {
+      setSavingTarget(true);
+
+      const updated = await profileService.updateNutritionTarget(data);
+
+      setNutritionTarget(updated);
+      setCalorieModalVisible(false);
+
+      Alert.alert(
+        "Target Updated",
+        "Your daily nutrition target has been updated.",
+      );
+    } catch (error) {
+      console.error("Failed to update target:", error);
+
+      Alert.alert("Update Failed", "Could not update your nutrition target.");
+    } finally {
+      setSavingTarget(false);
+    }
   };
 
-  const handleExportData = () => {
-    Alert.alert("Export My Data", "Data export will be connected later.");
+  const handleRecalculateTarget = async () => {
+    try {
+      setSavingTarget(true);
+
+      const updated = await profileService.calculateNutritionTarget();
+
+      setNutritionTarget(updated);
+      setCalorieModalVisible(false);
+
+      Alert.alert(
+        "Target Recalculated",
+        "Your nutrition target was recalculated using your current profile.",
+      );
+    } catch (error) {
+      console.error("Failed to calculate target:", error);
+
+      Alert.alert(
+        "Calculation Failed",
+        "Please make sure your profile is complete.",
+      );
+    } finally {
+      setSavingTarget(false);
+    }
   };
 
   const handleLogout = () => {
@@ -57,37 +233,40 @@ export default function ProfileScreen() {
       {
         text: "Log Out",
         style: "destructive",
-        onPress: () => {
-          // Authentication will be connected later.
+        onPress: async () => {
+          await logout();
+          router.replace("/auth/login");
         },
       },
     ]);
   };
 
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      "Delete Account",
-      "This action cannot be undone. Your account and nutrition data will be permanently deleted.",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Delete Account",
-          style: "destructive",
-          onPress: () => {
-            // Account deletion will be connected later.
-          },
-        },
-      ],
+  if (loading || !profile || !user) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color={colors.text} />
+          <Text style={styles.loadingText}>Loading profile...</Text>
+        </View>
+      </SafeAreaView>
     );
+  }
+
+  const dietaryNames = profile.dietaryRestrictions.map((item) => item.name);
+
+  const healthNames = profile.healthConditions.map((item) => item.name);
+
+  const activityLabels: Record<string, string> = {
+    SEDENTARY: "Sedentary",
+    LIGHTLY_ACTIVE: "Lightly active",
+    MODERATELY_ACTIVE: "Moderate",
+    VERY_ACTIVE: "Very active",
+    EXTRA_ACTIVE: "Extra active",
   };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <View style={styles.container}>
-        {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerText}>
             <Text style={styles.title}>Profile & Settings</Text>
@@ -102,94 +281,68 @@ export default function ProfileScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          {/* Profile Card */}
-          <ProfileCard onEditProfile={handleEditProfile} />
+          <ProfileCard
+            name={user.name}
+            email={user.email}
+            dietaryRestrictions={dietaryNames}
+            onEditProfile={() => setEditProfileVisible(true)}
+          />
 
-          {/* Nutrition & Health Profile */}
-          <View style={styles.sectionHeader}>
-            <View>
-              <Text style={styles.sectionTitle}>
-                NUTRITION & HEALTH PROFILE
-              </Text>
-            </View>
-
-            <View style={styles.syncedStatus}>
-              <View style={styles.syncedDot} />
-
-              <Text style={styles.syncedText}>Synced with 3D Scanner</Text>
-            </View>
+          <View style={styles.sectionHeaderOnly}>
+            <Text style={styles.sectionTitle}>NUTRITION & HEALTH PROFILE</Text>
           </View>
 
           <View style={styles.card}>
-            {/* Daily Calories */}
             <ProfileSettingRow
               title="Daily Calorie Target"
-              value="2,000 kcal / day"
+              value={
+                nutritionTarget
+                  ? `${Math.round(
+                      nutritionTarget.calorieTargetKcal,
+                    )} kcal / day`
+                  : "Not calculated"
+              }
               rightText="Adjust"
-              onPress={handleAdjustCalories}
+              onPress={() => setCalorieModalVisible(true)}
             />
 
-            {/* Dietary Preference */}
-            <View style={styles.dietaryRow}>
-              <Text style={styles.rowTitle}>Dietary Preference</Text>
+            <ProfileSettingRow
+              title="Dietary Preference"
+              value={
+                dietaryNames.length > 0
+                  ? dietaryNames.join(", ")
+                  : "None reported"
+              }
+              rightText="Edit"
+              onPress={() => setEditProfileVisible(true)}
+            />
 
-              <Text style={styles.rowValue}>Vegetarian</Text>
-
-              <View style={styles.preferenceOptions}>
-                <Pressable
-                  style={[styles.preferenceOption, styles.selectedPreference]}
-                  onPress={handleDietaryPreference}
-                >
-                  <Text
-                    style={[
-                      styles.preferenceText,
-                      styles.selectedPreferenceText,
-                    ]}
-                  >
-                    Veg
-                  </Text>
-                </Pressable>
-
-                <Pressable
-                  style={styles.preferenceOption}
-                  onPress={handleDietaryPreference}
-                >
-                  <Text style={styles.preferenceText}>Vegan</Text>
-                </Pressable>
-
-                <Pressable
-                  style={styles.preferenceOption}
-                  onPress={handleDietaryPreference}
-                >
-                  <Text style={styles.preferenceText}>Non-Veg</Text>
-                </Pressable>
-              </View>
-            </View>
-
-            {/* Activity */}
             <ProfileSettingRow
               title="Activity Level"
-              value="Moderate (3–5 workouts/wk)"
+              value={activityLabels[profile.activityLevel]}
               showChevron
+              onPress={() => setEditProfileVisible(true)}
             />
 
-            {/* Age & Weight */}
             <ProfileSettingRow
               title="Age & Weight"
-              value="28 yrs · 59.0 kg"
+              value={`${profile.age} yrs · ${profile.currentWeightKg} kg`}
               showChevron
+              onPress={() => setEditProfileVisible(true)}
             />
 
-            {/* Health Conditions */}
             <ProfileSettingRow
               title="Health Conditions"
-              value="None reported"
+              value={
+                healthNames.length > 0
+                  ? healthNames.join(", ")
+                  : "None reported"
+              }
               rightText="Edit"
-              onPress={handleHealthConditions}
+              onPress={() => setEditProfileVisible(true)}
             />
           </View>
 
-          {/* Settings */}
           <View style={styles.sectionHeaderOnly}>
             <Text style={styles.sectionTitle}>SETTINGS</Text>
           </View>
@@ -197,23 +350,14 @@ export default function ProfileScreen() {
           <View style={styles.card}>
             <SettingsRow
               title="Meal Reminders & Alerts"
-              subtitle="Notifications for breakfast, lunch & dinner"
+              subtitle="Notification preference"
               icon="notifications-outline"
               toggle
               toggleValue={mealReminders}
-              onToggle={setMealReminders}
-            />
-
-            <SettingsRow
-              title="Export My Data"
-              subtitle="Download logs as CSV or JSON report"
-              icon="download-outline"
-              showChevron
-              onPress={handleExportData}
+              onToggle={handleReminderToggle}
             />
           </View>
 
-          {/* Account */}
           <View style={styles.sectionHeaderOnly}>
             <Text style={styles.sectionTitle}>ACCOUNT</Text>
           </View>
@@ -228,34 +372,38 @@ export default function ProfileScreen() {
             />
           </View>
 
-          {/* Delete Account - visually separated */}
-          <View style={styles.deleteCard}>
-            <SettingsRow
-              title="Delete Account"
-              subtitle="Permanently delete your account and data"
-              icon="trash-outline"
-              showChevron
-              destructive
-              onPress={handleDeleteAccount}
-            />
-          </View>
-
-          {/* Footer */}
           <View style={styles.footer}>
             <Text style={styles.version}>
               NutriVision-3D v1.0.4 · Production Build
             </Text>
 
-            <Pressable>
-              <Text style={styles.legalText}>
-                Privacy Policy & Terms of Service
-              </Text>
-            </Pressable>
+            <Text style={styles.legalText}>
+              Privacy Policy & Terms of Service
+            </Text>
           </View>
         </ScrollView>
 
-        {/* Bottom Navigation */}
         <BottomNav active="profile" />
+
+        <EditProfileModal
+          visible={editProfileVisible}
+          profile={profile}
+          name={user.name}
+          restrictions={restrictions}
+          healthConditions={healthConditions}
+          loading={savingProfile}
+          onClose={() => setEditProfileVisible(false)}
+          onSave={handleSaveProfile}
+        />
+
+        <CalorieTargetModal
+          visible={calorieModalVisible}
+          target={nutritionTarget}
+          loading={savingTarget}
+          onClose={() => setCalorieModalVisible(false)}
+          onSave={handleSaveTarget}
+          onRecalculate={handleRecalculateTarget}
+        />
       </View>
     </SafeAreaView>
   );
@@ -301,15 +449,6 @@ const styles = StyleSheet.create({
     paddingBottom: 115,
   },
 
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    marginTop: 27,
-    marginBottom: 12,
-    gap: 10,
-  },
-
   sectionHeaderOnly: {
     marginTop: 27,
     marginBottom: 12,
@@ -322,25 +461,6 @@ const styles = StyleSheet.create({
     color: colors.secondaryText,
   },
 
-  syncedStatus: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-  },
-
-  syncedDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 6,
-    backgroundColor: "#2E7D32",
-  },
-
-  syncedText: {
-    fontSize: 9,
-    fontWeight: "600",
-    color: "#2E7D32",
-  },
-
   card: {
     backgroundColor: colors.white,
     borderWidth: 1,
@@ -349,69 +469,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 17,
   },
 
-  dietaryRow: {
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-
-  rowTitle: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: colors.text,
-  },
-
-  rowValue: {
-    fontSize: 11,
-    color: colors.secondaryText,
-    marginTop: 4,
-  },
-
-  preferenceOptions: {
-    flexDirection: "row",
-    gap: 7,
-    marginTop: 11,
-  },
-
-  preferenceOption: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 18,
-    backgroundColor: "#F5F5F5",
-    borderWidth: 1,
-    borderColor: "#E5E5E5",
-  },
-
-  selectedPreference: {
-    backgroundColor: "#E5F2E7",
-    borderColor: "#9CC9A3",
-  },
-
-  preferenceText: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: colors.secondaryText,
-  },
-
-  selectedPreferenceText: {
-    color: "#2E7D32",
-  },
-
   accountCard: {
     backgroundColor: colors.white,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 18,
     paddingHorizontal: 17,
-  },
-
-  deleteCard: {
-    backgroundColor: "#FFF9F8",
-    borderWidth: 1,
-    borderColor: "#F3D5D1",
-    borderRadius: 18,
-    paddingHorizontal: 17,
-    marginTop: 12,
   },
 
   footer: {
@@ -432,5 +495,17 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginTop: 9,
     textAlign: "center",
+  },
+
+  loadingContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  loadingText: {
+    marginTop: 10,
+    fontSize: 12,
+    color: colors.secondaryText,
   },
 });

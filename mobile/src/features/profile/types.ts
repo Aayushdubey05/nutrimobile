@@ -1,3 +1,5 @@
+import type { UserInfo } from "@/features/auth/types";
+
 export type GenderType = "MALE" | "FEMALE" | "OTHER" | "PREFER_NOT_TO_SAY";
 
 export type FitnessGoalType =
@@ -26,18 +28,6 @@ export interface HealthCondition {
   name: string;
 }
 
-export interface UpdateUserProfileRequest {
-  age: number;
-  gender: GenderType;
-  heightCm: number;
-  currentWeightKg: number;
-  targetWeightKg?: number | null;
-  fitnessGoal: FitnessGoalType;
-  activityLevel: ActivityLevelType;
-  dietaryRestrictionIds: number[];
-  healthConditionIds: number[];
-}
-
 export interface UserProfileResponse {
   id: number;
   age: number;
@@ -52,3 +42,43 @@ export interface UserProfileResponse {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface UpdateUserProfileRequest {
+  age: number;
+  gender: GenderType;
+  heightCm: number;
+  currentWeightKg: number;
+  targetWeightKg?: number | null;
+  fitnessGoal: FitnessGoalType;
+  activityLevel: ActivityLevelType;
+  dietaryRestrictionIds: number[];
+  healthConditionIds: number[];
+}
+
+export interface UpdateUserRequest {
+  name: string;
+}
+
+export interface UserSettingsResponse {
+  id: number;
+  notificationsEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpdateUserSettingsRequest {
+  notificationsEnabled: boolean;
+}
+
+export interface NutritionTargetResponse {
+  id: number;
+  calorieTargetKcal: number;
+  proteinTargetG: number;
+  carbohydrateTargetG: number;
+  fatTargetG: number;
+  calculationMethod: string;
+  customized: boolean;
+  effectiveFrom: string;
+}
+
+export type ProfileUserResponse = UserInfo;

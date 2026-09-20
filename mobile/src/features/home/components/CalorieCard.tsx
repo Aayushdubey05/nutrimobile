@@ -1,3 +1,4 @@
+import Svg, { Circle } from "react-native-svg";
 import { StyleSheet, Text, View } from "react-native";
 import { colors } from "../../../constants/colors";
 
@@ -22,20 +23,46 @@ export default function CalorieCard({
   carbs,
   fat,
 }: CalorieCardProps) {
-  const calorieRatio = Math.min(Math.max(consumed / target, 0), 1);
+  const calorieRatio = target > 0 ? Math.min(Math.max(consumed / target, 0), 1) : 0;
+
+  const size = 124;
+  const strokeWidth = 8;
+  const center = size / 2;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference * (1 - calorieRatio);
 
   return (
     <View style={styles.card}>
       {/* Left: Circular Calorie Progress Ring */}
       <View style={styles.leftContainer}>
         <View style={styles.ringOuter}>
-          {/* Active progress indicator ring simulation */}
-          <View
-            style={[
-              styles.ringProgressAccent,
-              { opacity: calorieRatio > 0 ? 1 : 0.3 },
-            ]}
-          />
+          <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
+            {/* Background Circle */}
+            <Circle
+              cx={center}
+              cy={center}
+              r={radius}
+              stroke="#F3F4F6"
+              strokeWidth={strokeWidth}
+              fill="none"
+            />
+            {/* Animated/Dynamic Progress Circle */}
+            {calorieRatio > 0 && (
+              <Circle
+                cx={center}
+                cy={center}
+                r={radius}
+                stroke="#171717"
+                strokeWidth={strokeWidth}
+                strokeDasharray={`${circumference}`}
+                strokeDashoffset={strokeDashoffset}
+                strokeLinecap="round"
+                fill="none"
+                transform={`rotate(-90 ${center} ${center})`}
+              />
+            )}
+          </Svg>
           <View style={styles.ringInner}>
             <Text style={styles.calorieLabel}>CALORIES</Text>
             <Text style={styles.calorieValue}>{consumed.toLocaleString()}</Text>
@@ -152,25 +179,9 @@ const styles = StyleSheet.create({
     width: 124,
     height: 124,
     borderRadius: 62,
-    borderWidth: 8,
-    borderColor: "#F3F4F6",
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
-  },
-
-  ringProgressAccent: {
-    position: "absolute",
-    top: -8,
-    left: -8,
-    right: -8,
-    bottom: -8,
-    borderRadius: 62,
-    borderWidth: 8,
-    borderColor: "#171717",
-    borderTopColor: "transparent",
-    borderLeftColor: "transparent",
-    transform: [{ rotate: "-45deg" }],
   },
 
   ringInner: {

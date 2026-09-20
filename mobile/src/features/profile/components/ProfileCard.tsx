@@ -3,27 +3,44 @@ import { Ionicons } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 interface ProfileCardProps {
+  name: string;
+  email: string;
+  dietaryRestrictions: string[];
   onEditProfile?: () => void;
 }
 
-export default function ProfileCard({ onEditProfile }: ProfileCardProps) {
+export default function ProfileCard({
+  name,
+  email,
+  dietaryRestrictions,
+  onEditProfile,
+}: ProfileCardProps) {
+  const initial = name?.trim().charAt(0).toUpperCase() || "?";
+
+  const dietaryLabel =
+    dietaryRestrictions.length === 0
+      ? "No dietary restriction"
+      : dietaryRestrictions.length === 1
+        ? dietaryRestrictions[0]
+        : `${dietaryRestrictions.length} dietary preferences`;
+
   return (
     <View style={styles.card}>
       <View style={styles.profileInfo}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>R</Text>
+          <Text style={styles.avatarText}>{initial}</Text>
         </View>
 
         <View style={styles.details}>
           <View style={styles.nameRow}>
-            <Text style={styles.name}>Ritesh</Text>
+            <Text style={styles.name}>{name}</Text>
 
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>Vegetarian</Text>
+              <Text style={styles.badgeText}>{dietaryLabel}</Text>
             </View>
           </View>
 
-          <Text style={styles.email}>ritesh@example.com</Text>
+          <Text style={styles.email}>{email}</Text>
         </View>
       </View>
 
