@@ -17,7 +17,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://zbocavqovvdhtz4tkrj49bhs.195.35.7.46.sslip.io/api/v1"
+        "EXPO_PUBLIC_API_URL": "http://cyswoyfbdxzcw36uxf3edrl6.195.35.7.46.sslip.io/api/v1"
       }
     },
     "production": {
