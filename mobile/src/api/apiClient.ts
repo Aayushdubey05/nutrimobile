@@ -13,9 +13,9 @@ const apiClient = axios.create({
 });
 
 let isRefreshing = false;
-
 let refreshPromise: Promise<string | null> | null = null;
 
+// Request logging
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     const accessToken = await authStorage.getAccessToken();
@@ -24,15 +24,31 @@ apiClient.interceptors.request.use(
       config.headers.Authorization = `Bearer ${accessToken}`;
     }
 
+    console.log(`[API] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+    if (config.data) {
+      console.log(`[API] Request body:`, config.data);
+    }
+
     return config;
   },
 );
 
+// Response logging
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log(`[API] ${response.config.method?.toUpperCase()} ${response.config.url} - ${response.status}`);
+    return response;
+  },
 
   async (error: AxiosError<ApiErrorResponse>) => {
     const originalRequest = error.config;
+
+    console.error(`[API Error] ${error.config?.method?.toUpperCase()} ${error.config?.url}:`, {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data,
+      code: error.code,
+    });
 
     if (
       error.response?.status !== 401 ||
@@ -47,7 +63,6 @@ apiClient.interceptors.response.use(
     try {
       if (!isRefreshing) {
         isRefreshing = true;
-
         refreshPromise = refreshAccessToken();
       }
 
@@ -62,7 +77,6 @@ apiClient.interceptors.response.use(
       return apiClient(originalRequest);
     } catch (refreshError) {
       await authStorage.clearTokens();
-
       return Promise.reject(refreshError);
     } finally {
       isRefreshing = false;

@@ -1,7 +1,6 @@
 package com.nutrivision.backend.analysis.dto.response;
 
 import java.math.BigDecimal;
-import java.util.List;
 
 public record FoodAnalysisItemResponse(
         Long id,
@@ -12,7 +11,6 @@ public record FoodAnalysisItemResponse(
         BigDecimal finalWeightG,
         Long finalFoodId,
         String finalFoodName,
-        List<AiModelResultResponse> aiModelResults,
         ExplainabilityResultResponse explainability
 ) {
 }

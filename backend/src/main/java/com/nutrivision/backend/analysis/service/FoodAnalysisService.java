@@ -2,10 +2,14 @@ package com.nutrivision.backend.analysis.service;
 
 import com.nutrivision.backend.analysis.dto.request.CreateAnalysisRequest;
 import com.nutrivision.backend.analysis.dto.request.UpdateAnalysisItemRequest;
-import com.nutrivision.backend.analysis.dto.response.AiModelResultResponse;
 import com.nutrivision.backend.analysis.dto.response.ExplainabilityResultResponse;
 import com.nutrivision.backend.analysis.dto.response.FoodAnalysisItemResponse;
 import com.nutrivision.backend.analysis.dto.response.FoodAnalysisResponse;
+import com.nutrivision.backend.analysis.dto.gemini.BoundingBox;
+import com.nutrivision.backend.analysis.dto.gemini.GeminiAnalysisResult;
+import com.nutrivision.backend.analysis.dto.gemini.GeminiDetectedFood;
+import com.nutrivision.backend.analysis.dto.gemini.GeminiModelInfo;
+import com.nutrivision.backend.analysis.dto.gemini.MatchedFood;
 import com.nutrivision.backend.analysis.entity.AiModelResult;
 import com.nutrivision.backend.analysis.entity.AnalysisStatus;
 import com.nutrivision.backend.analysis.entity.ExplainabilityResult;
@@ -40,6 +44,9 @@ public class FoodAnalysisService {
     private final AiModelResultRepository aiModelResultRepository;
     private final ExplainabilityResultRepository explainabilityResultRepository;
 
+    private final GeminiService geminiService;
+    private final FoodMatcher foodMatcher;
+
     @Transactional
     public FoodAnalysisResponse createAnalysis(
             Long userId,
@@ -49,88 +56,88 @@ public class FoodAnalysisService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
-        /*
-         * Dummy AI implementation.
-         *
-         * Later this part will be replaced by the actual ML service.
-         */
-        Food dummyFood = foodRepository.findAll()
-                .stream()
-                .findFirst()
-                .orElseThrow(() ->
-                        new IllegalArgumentException(
-                                "No food available for dummy analysis"
-                        )
-                );
-
         OffsetDateTime now = OffsetDateTime.now();
 
+        // 1. Create parent analysis record (status = PROCESSING)
         FoodAnalysis analysis = new FoodAnalysis();
-
         analysis.setUser(user);
         analysis.setImageUrl(request.imageUrl());
         analysis.setStatus(AnalysisStatus.PROCESSING);
         analysis.setCreatedAt(now);
-
         FoodAnalysis savedAnalysis = foodAnalysisRepository.save(analysis);
 
-        /*
-         * Dummy detected food.
-         */
-        FoodAnalysisItem item = new FoodAnalysisItem();
+        try {
+            // 2. Call Gemini
+            GeminiAnalysisResult geminiResult = geminiService.analyzeFoodImage(request.imageUrl());
 
-        item.setAnalysis(savedAnalysis);
-        item.setFood(dummyFood);
-        item.setDetectedName(dummyFood.getName());
-        item.setConfidence(new BigDecimal("0.92"));
-        item.setEstimatedWeightG(new BigDecimal("150.00"));
-        item.setFinalWeightG(new BigDecimal("150.00"));
-        item.setFinalFood(dummyFood);
-        item.setCreatedAt(now);
+            // 3. Match/Create foods
+            List<MatchedFood> matchedFoods = foodMatcher.matchOrCreateFoods(geminiResult.getFoods());
 
-        FoodAnalysisItem savedItem =
-                foodAnalysisItemRepository.save(item);
+            // 4. Persist each detected food item
+            for (MatchedFood mf : matchedFoods) {
+                GeminiDetectedFood gf = mf.getDetected();
 
-        /*
-         * Dummy AI model information.
-         */
-        AiModelResult modelResult = new AiModelResult();
+                FoodAnalysisItem item = new FoodAnalysisItem();
+                item.setAnalysis(savedAnalysis);
+                item.setFood(mf.getFood());                    // Matched or new Food entity
+                item.setDetectedName(gf.getName());
+                item.setConfidence(BigDecimal.valueOf(gf.getConfidence()));
+                item.setEstimatedWeightG(BigDecimal.valueOf(gf.getEstimatedWeightG()));
+                item.setFinalWeightG(BigDecimal.valueOf(gf.getEstimatedWeightG())); // User can adjust later
+                item.setFinalFood(mf.getFood());               // Initially same as detected
+                item.setCreatedAt(now);
+                FoodAnalysisItem savedItem = foodAnalysisItemRepository.save(item);
 
-        modelResult.setAnalysisItem(savedItem);
-        modelResult.setModelName("DummyFoodDetector");
-        modelResult.setModelVersion("1.0");
-        modelResult.setConfidence(new BigDecimal("0.92"));
-        modelResult.setProcessingTimeMs(120);
-        modelResult.setCreatedAt(now);
+                // 5. Save AiModelResult
+                AiModelResult modelResult = new AiModelResult();
+                modelResult.setAnalysisItem(savedItem);
+                GeminiModelInfo modelInfo = geminiResult.getModelInfo();
+                modelResult.setModelName(modelInfo != null ? modelInfo.getModel() : "gemini-1.5-pro");
+                modelResult.setModelVersion("1.0");
+                modelResult.setConfidence(BigDecimal.valueOf(gf.getConfidence()));
+                modelResult.setProcessingTimeMs(modelInfo != null ? modelInfo.getProcessingTimeMs().intValue() : 0);
+                modelResult.setCreatedAt(now);
+                aiModelResultRepository.save(modelResult);
 
-        aiModelResultRepository.save(modelResult);
+                // 6. Save ExplainabilityResult (caption + optional bounding box hint)
+                ExplainabilityResult explainability = new ExplainabilityResult();
+                explainability.setAnalysisItem(savedItem);
+                explainability.setHeatmapUrl(null); // Future: generate from bounding box
+                String caption = "Detected " + gf.getName() + " with " +
+                        String.format("%.0f%%", gf.getConfidence() * 100) + " confidence. " +
+                        "Estimated portion: " + gf.getEstimatedWeightG() + "g.";
+                if (gf.getBoundingBox() != null) {
+                    BoundingBox bb = gf.getBoundingBox();
+                    caption += " Bounding box: [" + bb.getX() + ", " +
+                            bb.getY() + ", " +
+                            bb.getWidth() + ", " +
+                            bb.getHeight() + "]";
+                }
+                explainability.setCaption(caption);
+                explainability.setCreatedAt(now);
+                explainabilityResultRepository.save(explainability);
+            }
 
-        /*
-         * Dummy explainability result.
-         */
-        ExplainabilityResult explainability = new ExplainabilityResult();
+            // 7. Mark completed
+            savedAnalysis.setStatus(AnalysisStatus.COMPLETED);
+            savedAnalysis.setCompletedAt(OffsetDateTime.now());
+            foodAnalysisRepository.save(savedAnalysis);
 
-        explainability.setAnalysisItem(savedItem);
-        explainability.setHeatmapUrl(null);
-        explainability.setCaption(
-                "The model detected " +
-                        dummyFood.getName() +
-                        " in the uploaded food image."
-        );
-        explainability.setCreatedAt(now);
+        } catch (AnalysisException e) {
+            // 8. Mark failed
+            savedAnalysis.setStatus(AnalysisStatus.FAILED);
+            savedAnalysis.setCompletedAt(OffsetDateTime.now());
+            foodAnalysisRepository.save(savedAnalysis);
+            throw e;
+        } catch (Exception e) {
+            // 8. Mark failed
+            savedAnalysis.setStatus(AnalysisStatus.FAILED);
+            savedAnalysis.setCompletedAt(OffsetDateTime.now());
+            foodAnalysisRepository.save(savedAnalysis);
+            throw new AnalysisException("Food analysis failed: " + e.getMessage(), e);
+        }
 
-        explainabilityResultRepository.save(explainability);
-
-        /*
-         * Mark analysis as completed.
-         */
-        savedAnalysis.setStatus(AnalysisStatus.COMPLETED);
-        savedAnalysis.setCompletedAt(OffsetDateTime.now());
-
-        FoodAnalysis completedAnalysis =
-                foodAnalysisRepository.save(savedAnalysis);
-
-        return toResponse(completedAnalysis);
+        return toResponse(savedAnalysis);
     }
 
     public FoodAnalysisResponse getAnalysis(
@@ -246,13 +253,6 @@ public class FoodAnalysisService {
             FoodAnalysisItem item
     ) {
 
-        List<AiModelResultResponse> aiResults =
-                aiModelResultRepository
-                        .findByAnalysisItemId(item.getId())
-                        .stream()
-                        .map(this::toAiModelResultResponse)
-                        .toList();
-
         ExplainabilityResultResponse explainability =
                 explainabilityResultRepository
                         .findByAnalysisItemId(item.getId())
@@ -272,21 +272,7 @@ public class FoodAnalysisService {
                 item.getFinalFood() != null
                         ? item.getFinalFood().getName()
                         : null,
-                aiResults,
                 explainability
-        );
-    }
-
-    private AiModelResultResponse toAiModelResultResponse(
-            AiModelResult result
-    ) {
-
-        return new AiModelResultResponse(
-                result.getId(),
-                result.getModelName(),
-                result.getModelVersion(),
-                result.getConfidence(),
-                result.getProcessingTimeMs()
         );
     }
 
