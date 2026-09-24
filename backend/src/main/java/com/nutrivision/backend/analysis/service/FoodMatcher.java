@@ -37,7 +37,8 @@ public class FoodMatcher {
                 .toList();
     }
 
-    @Transactional
+    // Runs inside the caller's transaction; @Transactional on a private method is
+    // not proxied by Spring and had no effect.
     private MatchedFood matchOrCreateSingle(GeminiDetectedFood detected) {
         // 1. Try exact name match (case-insensitive)
         Optional<Food> exact = foodRepository.findByNameIgnoreCase(detected.getName());

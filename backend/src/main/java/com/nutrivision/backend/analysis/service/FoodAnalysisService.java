@@ -50,6 +50,7 @@ public class FoodAnalysisService {
     private final GeminiService geminiService;
     private final FoodMatcher foodMatcher;
     private final ImageStorageService imageStorageService;
+    private final AnalysisRecordWriter analysisRecordWriter;
 
     @Transactional
     public FoodAnalysisResponse createAnalysis(
@@ -100,18 +101,14 @@ public class FoodAnalysisService {
             Supplier<GeminiAnalysisResult> analyzer
     ) {
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        // 1. Create parent analysis record (status = PROCESSING) in its own
+        //    transaction, so a failure below still leaves a FAILED record behind.
+        Long analysisId = analysisRecordWriter.createProcessing(userId, imageUrl);
+
+        FoodAnalysis savedAnalysis = foodAnalysisRepository.findById(analysisId)
+                .orElseThrow(() -> new AnalysisException("Analysis record not found"));
 
         OffsetDateTime now = OffsetDateTime.now();
-
-        // 1. Create parent analysis record (status = PROCESSING)
-        FoodAnalysis analysis = new FoodAnalysis();
-        analysis.setUser(user);
-        analysis.setImageUrl(imageUrl);
-        analysis.setStatus(AnalysisStatus.PROCESSING);
-        analysis.setCreatedAt(now);
-        FoodAnalysis savedAnalysis = foodAnalysisRepository.save(analysis);
 
         try {
             // 2. Call Gemini
@@ -171,16 +168,11 @@ public class FoodAnalysisService {
             foodAnalysisRepository.save(savedAnalysis);
 
         } catch (AnalysisException e) {
-            // 8. Mark failed
-            savedAnalysis.setStatus(AnalysisStatus.FAILED);
-            savedAnalysis.setCompletedAt(OffsetDateTime.now());
-            foodAnalysisRepository.save(savedAnalysis);
+            // 8. Mark failed in a separate transaction, since this one rolls back.
+            analysisRecordWriter.markFailed(analysisId);
             throw e;
         } catch (Exception e) {
-            // 8. Mark failed
-            savedAnalysis.setStatus(AnalysisStatus.FAILED);
-            savedAnalysis.setCompletedAt(OffsetDateTime.now());
-            foodAnalysisRepository.save(savedAnalysis);
+            analysisRecordWriter.markFailed(analysisId);
             throw new AnalysisException("Food analysis failed: " + e.getMessage(), e);
         }
 
