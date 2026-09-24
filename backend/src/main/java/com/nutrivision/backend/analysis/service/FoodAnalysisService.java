@@ -92,7 +92,7 @@ public class FoodAnalysisService {
                 AiModelResult modelResult = new AiModelResult();
                 modelResult.setAnalysisItem(savedItem);
                 GeminiModelInfo modelInfo = geminiResult.getModelInfo();
-                modelResult.setModelName(modelInfo != null ? modelInfo.getModel() : "gemini-1.5-pro");
+                modelResult.setModelName(modelInfo != null ? modelInfo.getModel() : "gemini-3.8-flash");
                 modelResult.setModelVersion("1.0");
                 modelResult.setConfidence(BigDecimal.valueOf(gf.getConfidence()));
                 modelResult.setProcessingTimeMs(modelInfo != null ? modelInfo.getProcessingTimeMs().intValue() : 0);
