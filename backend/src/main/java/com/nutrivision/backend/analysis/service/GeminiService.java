@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nutrivision.backend.analysis.dto.gemini.BoundingBox;
 import com.nutrivision.backend.analysis.dto.gemini.GeminiAnalysisResult;
 import com.nutrivision.backend.analysis.dto.gemini.GeminiCandidate;
+import com.nutrivision.backend.analysis.dto.gemini.GeminiPart;
 import com.nutrivision.backend.analysis.dto.gemini.GeminiDetectedFood;
 import com.nutrivision.backend.analysis.dto.gemini.GeminiGenerateContentRequest;
 import com.nutrivision.backend.analysis.dto.gemini.GeminiGenerateContentResponse;
@@ -50,12 +51,22 @@ public class GeminiService {
     }
 
     public GeminiAnalysisResult analyzeFoodImage(String imageUrl) {
+        byte[] imageBytes = downloadImage(imageUrl);
+        return analyzeFoodImageBytes(imageBytes, detectMimeType(imageBytes, imageUrl));
+    }
+
+    /**
+     * Analyzes image bytes directly, for photos uploaded from the device that the
+     * server cannot fetch by URL.
+     */
+    public GeminiAnalysisResult analyzeFoodImageBytes(byte[] imageBytes, String mimeType) {
         long start = System.currentTimeMillis();
 
         try {
-            // 1. Download image & convert to base64
-            byte[] imageBytes = downloadImage(imageUrl);
-            String mimeType = detectMimeType(imageBytes, imageUrl);
+            // 1. Convert to base64
+            if (mimeType == null || mimeType.isBlank()) {
+                mimeType = detectMimeType(imageBytes, "");
+            }
             String base64 = Base64.encodeBase64String(imageBytes);
 
             // 2. Build request
@@ -132,12 +143,21 @@ public class GeminiService {
 
         GeminiCandidate candidate = response.getCandidates().get(0);
         if (candidate.getContent() == null || candidate.getContent().getParts() == null || candidate.getContent().getParts().isEmpty()) {
-            throw new AnalysisException("No content in Gemini response");
+            throw new AnalysisException(
+                    "No content in Gemini response (finishReason=" + candidate.getFinishReason() + ")");
         }
 
-        String text = candidate.getContent().getParts().get(0).getText();
-        if (text == null || text.trim().isEmpty()) {
-            throw new AnalysisException("Empty text in Gemini response");
+        // Thinking models can emit reasoning parts before the answer, so take the
+        // first part that actually carries text rather than assuming index 0.
+        String text = candidate.getContent().getParts().stream()
+                .map(GeminiPart::getText)
+                .filter(part -> part != null && !part.trim().isEmpty())
+                .findFirst()
+                .orElse(null);
+
+        if (text == null) {
+            throw new AnalysisException(
+                    "Empty text in Gemini response (finishReason=" + candidate.getFinishReason() + ")");
         }
 
         // Strip markdown code fences if present

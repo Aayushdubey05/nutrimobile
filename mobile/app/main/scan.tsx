@@ -1,7 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
+import { CameraView, useCameraPermissions, type FlashMode } from "expo-camera";
+import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Pressable,
   SafeAreaView,
@@ -17,37 +20,38 @@ import { analysisService } from "../../src/features/analysis/services/analysisSe
 
 export default function ScanScreen() {
   const [loading, setLoading] = useState(false);
+  const [flash, setFlash] = useState<FlashMode>("off");
+  const [cameraReady, setCameraReady] = useState(false);
 
-  const handleCapture = async () => {
-    if (loading) {
-      return;
-    }
+  const cameraRef = useRef<CameraView>(null);
+  const [permission, requestPermission] = useCameraPermissions();
 
+  /** Uploads the image and moves on to the review screen. */
+  const analyze = async (
+    uri: string,
+    mimeType?: string | null,
+    fileName?: string | null,
+  ) => {
     try {
       setLoading(true);
 
-      /*
-       * Temporary image URL.
-       *
-       * This is only for frontend/backend integration testing.
-       * Later this will be replaced by the actual captured image
-       * uploaded to your backend/storage.
-       */
-      const imageUrl =
-        "https://images.unsplash.com/photo-1610192244261-3f33de3f55e4?auto=format&fit=crop&w=900&q=85";
-
-      const analysis = await analysisService.createAnalysis({
-        imageUrl,
-      });
+      const analysis = await analysisService.analyzeImage(
+        uri,
+        mimeType ?? "image/jpeg",
+        fileName ?? "meal.jpg",
+      );
 
       router.push({
         pathname: "/main/segmentation-review",
         params: {
           analysisId: String(analysis.id),
+          // The stored image is served from an authenticated endpoint, so show the
+          // local file we just captured instead of re-fetching it.
+          imageUri: uri,
         },
       });
     } catch (error: any) {
-      console.error("Analysis creation failed:", error);
+      console.error("Analysis failed:", error);
 
       Alert.alert(
         "Analysis failed",
@@ -60,9 +64,112 @@ export default function ScanScreen() {
     }
   };
 
+  const handleCapture = async () => {
+    if (loading || !cameraReady) {
+      return;
+    }
+
+    try {
+      const photo = await cameraRef.current?.takePictureAsync({
+        quality: 0.7,
+      });
+
+      if (!photo?.uri) {
+        throw new Error("Could not capture the photo.");
+      }
+
+      await analyze(photo.uri, "image/jpeg", "meal.jpg");
+    } catch (error: any) {
+      console.error("Capture failed:", error);
+
+      Alert.alert("Capture failed", error?.message || "Unable to take a photo.");
+    }
+  };
+
+  const handlePickFromGallery = async () => {
+    if (loading) {
+      return;
+    }
+
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        quality: 0.7,
+      });
+
+      if (result.canceled) {
+        return;
+      }
+
+      const asset = result.assets?.[0];
+
+      if (!asset?.uri) {
+        return;
+      }
+
+      await analyze(asset.uri, asset.mimeType, asset.fileName);
+    } catch (error: any) {
+      console.error("Gallery pick failed:", error);
+
+      Alert.alert(
+        "Could not open gallery",
+        error?.message || "Unable to select an image.",
+      );
+    }
+  };
+
+  // Permissions are still loading.
+  if (!permission) {
+    return (
+      <View style={[styles.screen, styles.centered]}>
+        <ActivityIndicator color={colors.white} />
+      </View>
+    );
+  }
+
+  // Camera access not granted yet - ask for it instead of showing a dead screen.
+  if (!permission.granted) {
+    return (
+      <View style={[styles.screen, styles.centered]}>
+        <SafeAreaView style={[styles.safeArea, styles.centered]}>
+          <Ionicons name="camera-outline" size={56} color={colors.white} />
+
+          <Text style={styles.permissionTitle}>Camera access needed</Text>
+
+          <Text style={styles.permissionText}>
+            NutriVision uses your camera to scan meals and estimate their
+            nutrition.
+          </Text>
+
+          <Pressable style={styles.permissionButton} onPress={requestPermission}>
+            <Text style={styles.permissionButtonText}>Grant access</Text>
+          </Pressable>
+
+          <Pressable style={styles.permissionSecondary} onPress={handlePickFromGallery}>
+            <Text style={styles.permissionSecondaryText}>
+              Choose from gallery instead
+            </Text>
+          </Pressable>
+
+          <Pressable style={styles.permissionSecondary} onPress={() => router.back()}>
+            <Text style={styles.permissionSecondaryText}>Go back</Text>
+          </Pressable>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.screen}>
       <View style={styles.cameraPreview}>
+        <CameraView
+          ref={cameraRef}
+          style={StyleSheet.absoluteFill}
+          facing="back"
+          flash={flash}
+          onCameraReady={() => setCameraReady(true)}
+        />
+
         <SafeAreaView style={styles.safeArea}>
           {/* Header */}
           <View style={styles.header}>
@@ -78,10 +185,14 @@ export default function ScanScreen() {
 
             <Pressable
               style={styles.iconButton}
-              onPress={() => {}}
+              onPress={() => setFlash((current) => (current === "off" ? "on" : "off"))}
               disabled={loading}
             >
-              <Ionicons name="flash-outline" size={22} color={colors.white} />
+              <Ionicons
+                name={flash === "on" ? "flash" : "flash-outline"}
+                size={22}
+                color={colors.white}
+              />
             </Pressable>
           </View>
 
@@ -94,7 +205,11 @@ export default function ScanScreen() {
               {loading ? "Analyzing your meal..." : "Capture your meal"}
             </Text>
 
-            <CameraTip />
+            {loading ? (
+              <ActivityIndicator color={colors.white} style={styles.spinner} />
+            ) : (
+              <CameraTip />
+            )}
           </View>
 
           {/* Bottom controls */}
@@ -102,7 +217,7 @@ export default function ScanScreen() {
             {/* Gallery */}
             <Pressable
               style={styles.sideButton}
-              onPress={() => {}}
+              onPress={handlePickFromGallery}
               disabled={loading}
             >
               <Ionicons name="images-outline" size={24} color={colors.white} />
@@ -115,10 +230,10 @@ export default function ScanScreen() {
               style={({ pressed }) => [
                 styles.captureButton,
                 pressed && !loading && styles.capturePressed,
-                loading && styles.captureDisabled,
+                (loading || !cameraReady) && styles.captureDisabled,
               ]}
               onPress={handleCapture}
-              disabled={loading}
+              disabled={loading || !cameraReady}
             >
               <View style={styles.captureInner} pointerEvents="none" />
             </Pressable>
@@ -138,6 +253,11 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: "#111111",
+  },
+
+  centered: {
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   cameraPreview: {
@@ -185,6 +305,10 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.white,
     marginBottom: 8,
+  },
+
+  spinner: {
+    marginTop: 4,
   },
 
   bottomControls: {
@@ -245,5 +369,45 @@ const styles = StyleSheet.create({
 
   captureDisabled: {
     opacity: 0.6,
+  },
+
+  permissionTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: colors.white,
+    marginTop: 18,
+  },
+
+  permissionText: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.75)",
+    textAlign: "center",
+    marginTop: 10,
+    paddingHorizontal: 40,
+    lineHeight: 20,
+  },
+
+  permissionButton: {
+    marginTop: 26,
+    paddingHorizontal: 30,
+    paddingVertical: 13,
+    borderRadius: 14,
+    // Light pill on the dark camera screen; colors.primary is near-black here.
+    backgroundColor: colors.white,
+  },
+
+  permissionButtonText: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: "600",
+  },
+
+  permissionSecondary: {
+    marginTop: 16,
+  },
+
+  permissionSecondaryText: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 14,
   },
 });

@@ -22,8 +22,9 @@ import { analysisService } from "../../src/features/analysis/services/analysisSe
 import type { FoodAnalysisResponse } from "../../src/features/analysis/types";
 
 export default function SegmentationReviewScreen() {
-  const { analysisId } = useLocalSearchParams<{
+  const { analysisId, imageUri } = useLocalSearchParams<{
     analysisId?: string;
+    imageUri?: string;
   }>();
 
   const [analysis, setAnalysis] = useState<FoodAnalysisResponse | null>(null);
@@ -213,7 +214,7 @@ export default function SegmentationReviewScreen() {
             <>
               <SegmentationPreview
                 items={segments}
-                imageUri={analysis?.imageUrl}
+                imageUri={imageUri ?? analysis?.imageUrl}
               />
 
               <View style={styles.portionsHeader}>

@@ -17,6 +17,9 @@ services:
       GEMINI_MAX_TOKENS: ${GEMINI_MAX_TOKENS:-8192}
       GEMINI_TIMEOUT_SECONDS: ${GEMINI_TIMEOUT_SECONDS:-60}
       GEMINI_API_URL: ${GEMINI_API_URL:-https://generativelanguage.googleapis.com/v1beta/models}
+      APP_UPLOAD_DIR: /app/uploads
+    volumes:
+      - uploads:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -39,3 +42,4 @@ services:
 
 volumes:
   postgres_data:
+  uploads:

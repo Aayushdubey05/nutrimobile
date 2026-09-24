@@ -38,6 +38,7 @@ export const ENDPOINTS = {
   ANALYSIS: {
     LIST: "/analysis",
     CREATE: "/analysis",
+    UPLOAD: "/analysis/upload",
     BY_ID: (analysisId: number) => `/analysis/${analysisId}`,
     UPDATE_ITEM: (analysisId: number, itemId: number) =>
       `/analysis/${analysisId}/items/${itemId}`,

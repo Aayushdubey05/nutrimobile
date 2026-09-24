@@ -26,6 +26,40 @@ export const analysisService = {
     return response.data.data;
   },
 
+  /**
+   * Uploads a photo captured with the camera or picked from the library. The file
+   * is sent as multipart form-data because the server cannot fetch a local file:// URI.
+   */
+  async analyzeImage(
+    uri: string,
+    mimeType = "image/jpeg",
+    fileName = "meal.jpg",
+  ): Promise<FoodAnalysisResponse> {
+    const form = new FormData();
+
+    // React Native's FormData takes this {uri, name, type} shape for file parts.
+    form.append("image", {
+      uri,
+      name: fileName,
+      type: mimeType,
+    } as any);
+
+    const response = await apiClient.post<ApiResponse<FoodAnalysisResponse>>(
+      ENDPOINTS.ANALYSIS.UPLOAD,
+      form,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 90000,
+      },
+    );
+
+    if (!response.data.data) {
+      throw new Error(response.data.message || "Failed to analyze image");
+    }
+
+    return response.data.data;
+  },
+
   async getAnalysis(analysisId: number): Promise<FoodAnalysisResponse> {
     const response = await apiClient.get<ApiResponse<FoodAnalysisResponse>>(
       ENDPOINTS.ANALYSIS.BY_ID(analysisId),

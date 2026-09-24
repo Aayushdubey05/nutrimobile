@@ -26,10 +26,13 @@ import com.nutrivision.backend.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.function.Supplier;
 
 @Service
 @RequiredArgsConstructor
@@ -46,11 +49,55 @@ public class FoodAnalysisService {
 
     private final GeminiService geminiService;
     private final FoodMatcher foodMatcher;
+    private final ImageStorageService imageStorageService;
 
     @Transactional
     public FoodAnalysisResponse createAnalysis(
             Long userId,
             CreateAnalysisRequest request
+    ) {
+        return runAnalysis(
+                userId,
+                request.imageUrl(),
+                () -> geminiService.analyzeFoodImage(request.imageUrl())
+        );
+    }
+
+    /**
+     * Analyzes a photo captured or picked on the device. The server cannot fetch a
+     * {@code file://} URI, so the image is uploaded, stored, and sent to Gemini as bytes.
+     */
+    @Transactional
+    public FoodAnalysisResponse createAnalysisFromUpload(
+            Long userId,
+            MultipartFile image
+    ) {
+
+        if (image == null || image.isEmpty()) {
+            throw new IllegalArgumentException("Image file is required");
+        }
+
+        byte[] content;
+        try {
+            content = image.getBytes();
+        } catch (IOException e) {
+            throw new AnalysisException("Failed to read uploaded image", e);
+        }
+
+        String contentType = image.getContentType();
+        String fileName = imageStorageService.store(content, contentType);
+
+        return runAnalysis(
+                userId,
+                imageStorageService.toImageUrl(fileName),
+                () -> geminiService.analyzeFoodImageBytes(content, contentType)
+        );
+    }
+
+    private FoodAnalysisResponse runAnalysis(
+            Long userId,
+            String imageUrl,
+            Supplier<GeminiAnalysisResult> analyzer
     ) {
 
         User user = userRepository.findById(userId)
@@ -61,14 +108,14 @@ public class FoodAnalysisService {
         // 1. Create parent analysis record (status = PROCESSING)
         FoodAnalysis analysis = new FoodAnalysis();
         analysis.setUser(user);
-        analysis.setImageUrl(request.imageUrl());
+        analysis.setImageUrl(imageUrl);
         analysis.setStatus(AnalysisStatus.PROCESSING);
         analysis.setCreatedAt(now);
         FoodAnalysis savedAnalysis = foodAnalysisRepository.save(analysis);
 
         try {
             // 2. Call Gemini
-            GeminiAnalysisResult geminiResult = geminiService.analyzeFoodImage(request.imageUrl());
+            GeminiAnalysisResult geminiResult = analyzer.get();
 
             // 3. Match/Create foods
             List<MatchedFood> matchedFoods = foodMatcher.matchOrCreateFoods(geminiResult.getFoods());

@@ -35,18 +35,30 @@ public class NutritionService {
     private final UserRepository userRepository;
     private final MealRepository mealRepository;
 
+    @Transactional
     public NutritionTargetResponse getCurrentTarget(Long userId) {
 
-        NutritionTarget target =
-                nutritionTargetRepository
-                        .findFirstByUserIdOrderByEffectiveFromDesc(userId)
-                        .orElseThrow(() ->
-                                new IllegalArgumentException(
-                                        "Nutrition target not found"
-                                )
-                        );
+        return toTargetResponse(resolveTarget(userId));
+    }
 
-        return toTargetResponse(target);
+    /**
+     * Returns the user's current target, deriving one from their profile if none exists
+     * yet. Without this, anything that reads daily nutrition (dashboard, recommendations)
+     * fails outright for a user whose target was never calculated.
+     */
+    @Transactional
+    public NutritionTarget resolveTarget(Long userId) {
+
+        return nutritionTargetRepository
+                .findFirstByUserIdOrderByEffectiveFromDesc(userId)
+                .orElseGet(() -> {
+                    calculateAndCreateTarget(userId);
+                    return nutritionTargetRepository
+                            .findFirstByUserIdOrderByEffectiveFromDesc(userId)
+                            .orElseThrow(() -> new IllegalArgumentException(
+                                    "Nutrition target could not be created"
+                            ));
+                });
     }
 
     @Transactional
@@ -123,6 +135,7 @@ public class NutritionService {
         return toTargetResponse(savedTarget);
     }
 
+    @Transactional
     public DailyNutritionResponse getDailyNutrition(
             Long userId,
             LocalDate date
@@ -130,14 +143,7 @@ public class NutritionService {
 
         findUser(userId);
 
-        NutritionTarget target =
-                nutritionTargetRepository
-                        .findFirstByUserIdOrderByEffectiveFromDesc(userId)
-                        .orElseThrow(() ->
-                                new IllegalArgumentException(
-                                        "Nutrition target not found"
-                                )
-                        );
+        NutritionTarget target = resolveTarget(userId);
 
         List<Meal> meals =
                 mealRepository.findByUserIdAndMealDateOrderByMealTimeDesc(

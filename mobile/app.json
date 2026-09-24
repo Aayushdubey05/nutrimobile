@@ -38,6 +38,18 @@
       "expo-image",
       "expo-web-browser",
       [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow NutriVision to use your camera to scan meals."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow NutriVision to access your photos so you can analyze a meal you already took."
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "android": {
